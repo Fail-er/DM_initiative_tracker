@@ -457,6 +457,11 @@ const Encounter = (() => {
   /** Advances to the next combatant in turn order. Wrapping past the last
    *  combatant rolls over to the first WITHOUT incrementing the round --
    *  use nextRound() for that. */
+  /** Advances to the next combatant in turn order. Wrapping past the last
+   *  combatant rolls over to the first AND increments the round counter --
+   *  reaching the end of the initiative order is exactly when a new round
+   *  begins, regardless of whether the DM got there one step at a time or
+   *  used nextRound() to jump there directly. */
   function nextTurn() {
     const ordered = sortedInstances();
     if (!ordered.length) return;
@@ -464,9 +469,12 @@ const Encounter = (() => {
     const idx = ordered.findIndex((i) => i.instanceId === currentId);
     const nextIdx = (idx + 1) % ordered.length;
     state.activeInstanceId = ordered[nextIdx].instanceId;
+    if (nextIdx === 0) state.round++;
   }
 
-  /** Steps back to the previous combatant in turn order. Mirrors nextTurn(). */
+  /** Steps back to the previous combatant in turn order. Mirrors nextTurn():
+   *  wrapping backward from the first combatant to the last decrements the
+   *  round counter, clamped at a minimum of 1 (rounds don't go negative). */
   function previousTurn() {
     const ordered = sortedInstances();
     if (!ordered.length) return;
@@ -474,9 +482,12 @@ const Encounter = (() => {
     const idx = ordered.findIndex((i) => i.instanceId === currentId);
     const prevIdx = (idx - 1 + ordered.length) % ordered.length;
     state.activeInstanceId = ordered[prevIdx].instanceId;
+    if (prevIdx === ordered.length - 1) state.round = Math.max(1, state.round - 1);
   }
 
-  /** Jumps straight to the top of the turn order and increments the round counter. */
+  /** Jumps straight to the top of the turn order and increments the round
+   *  counter. Still useful as an explicit "skip the rest of this round"
+   *  action distinct from stepping through every remaining combatant. */
   function nextRound() {
     const ordered = sortedInstances();
     if (!ordered.length) return;

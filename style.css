@@ -1,0 +1,1139 @@
+/* =========================================================================
+   DM Encounter Tracker — styles
+   Design language: a DM's screen at the table, not a generic dashboard.
+   Dark aged-parchment background, a single gold accent reserved for the
+   active turn, muted reds/greens for damage/heal feedback. Display type
+   is used sparingly (titles, round counter); everything else is built
+   for fast scanning of numbers during play.
+   ========================================================================= */
+
+:root {
+  /* ---- palette ---- */
+  --bg-ink: #1a1714;
+  --bg-panel: #221d18;
+  --bg-panel-raised: #2a2420;
+  --border-soft: #3a322a;
+  --border-strong: #4a3f34;
+  --gold: #c9a876;
+  --gold-dim: #8a7252;
+  --text-parchment: #e8dfc8;
+  --text-muted: #a89a82;
+  --red-blood: #a84444;
+  --red-blood-dim: #6e3434;
+  --green-heal: #6f8f5f;
+  --green-heal-dim: #4d6240;
+  --steel-blue: #6f8fa8;
+  --steel-blue-dim: #4a6275;
+
+  /* ---- type ---- */
+  --font-display: 'Cinzel', Georgia, 'Times New Roman', serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  --radius-sm: 3px;
+  --radius-md: 6px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-ink);
+  color: var(--text-parchment);
+  font-family: var(--font-body);
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Respect reduced-motion preference: kill the transitions below. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* =========================================================================
+   Header
+   ========================================================================= */
+
+.app-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: linear-gradient(180deg, var(--bg-panel-raised), var(--bg-panel));
+  border-bottom: 2px solid var(--border-strong);
+  flex-shrink: 0;
+}
+
+.app-title {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  margin: 0;
+  font-weight: 600;
+}
+
+.header-shortcuts {
+  display: flex;
+  gap: 14px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.header-shortcuts kbd {
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  color: var(--gold-dim);
+  margin-right: 3px;
+}
+
+/* =========================================================================
+   Layout
+   ========================================================================= */
+
+.app-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 280px 1.4fr 320px;
+  gap: 1px;
+  overflow: hidden;
+  background: var(--border-soft);
+}
+
+.panel {
+  background: var(--bg-panel);
+  padding: 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panel h2 {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  letter-spacing: 0.03em;
+  color: var(--text-parchment);
+  margin: 0;
+  font-weight: 600;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.panel-header-encounter h2 {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  color: var(--gold);
+}
+
+.panel-header-secondary {
+  justify-content: flex-start;
+  margin-bottom: 8px;
+}
+
+/* =========================================================================
+   Buttons
+   ========================================================================= */
+
+.btn {
+  background: var(--bg-panel-raised);
+  color: var(--text-parchment);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.btn:hover {
+  background: var(--border-soft);
+  border-color: var(--gold-dim);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn:disabled:hover {
+  background: var(--bg-panel-raised);
+  border-color: var(--border-strong);
+}
+
+.group-selection-hint {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  align-self: center;
+}
+
+.btn-small {
+  padding: 5px 9px;
+  font-size: 0.75rem;
+}
+
+.btn-primary {
+  background: var(--gold-dim);
+  border-color: var(--gold);
+  color: #1a1714;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: var(--gold);
+}
+
+.btn-danger {
+  border-color: var(--red-blood-dim);
+  color: #e8c8c8;
+}
+
+.btn-danger:hover {
+  background: var(--red-blood-dim);
+  border-color: var(--red-blood);
+}
+
+.encounter-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* =========================================================================
+   LEFT PANEL: library / search
+   ========================================================================= */
+
+.search-input {
+  width: 100%;
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-parchment);
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+  font-family: var(--font-body);
+}
+
+.search-input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+  border-color: var(--gold-dim);
+}
+
+.monster-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.monster-row {
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.monster-row-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.monster-row-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-parchment);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.monster-row-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.monster-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.qty-input {
+  width: 42px;
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-parchment);
+  padding: 5px;
+  font-size: 0.8rem;
+  text-align: center;
+  font-family: var(--font-mono);
+}
+
+.import-status {
+  font-size: 0.78rem;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+
+.import-status-ok {
+  background: rgba(111, 143, 95, 0.15);
+  color: var(--green-heal);
+  border: 1px solid var(--green-heal-dim);
+}
+
+.import-status-warn {
+  background: rgba(201, 168, 118, 0.12);
+  color: var(--gold);
+  border: 1px solid var(--gold-dim);
+}
+
+.import-status-error {
+  background: rgba(168, 68, 68, 0.15);
+  color: #e8a8a8;
+  border: 1px solid var(--red-blood-dim);
+}
+
+/* =========================================================================
+   MIDDLE PANEL: turn order
+   ========================================================================= */
+
+.turn-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.turn-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+
+.turn-row:hover {
+  border-color: var(--border-strong);
+}
+
+.turn-row:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+/* Focused = clicked to view/edit in the right-hand detail panel.
+   Uses steel-blue so it never reads as "active turn" (gold) or
+   "picked for grouping" (the checkbox + tint below). */
+.turn-row-focused {
+  border-color: var(--steel-blue);
+  box-shadow: inset 0 0 0 1px rgba(111, 143, 168, 0.35);
+}
+
+/* Picked for manual grouping (checkbox / ctrl+click / shift+click).
+   A soft full-row tint, independent of focus or active-turn styling,
+   so a DM can see at a glance which rows are queued for "Group Selected". */
+.turn-row-group-selected {
+  background: #1f2a30;
+}
+
+/* The signature element: the active combatant's turn reads like an open
+   page in a spellbook -- a steady gold rule on the left and a small
+   glow, while every other row stays flat and quiet. This always wins
+   visually over focus/group-selection tints since it's the single most
+   important thing to spot during play. */
+.turn-row-active {
+  border-left-color: var(--gold);
+  background: #2e2718;
+  box-shadow: inset 0 0 0 1px rgba(201, 168, 118, 0.25);
+}
+
+.turn-row-active.turn-row-focused {
+  box-shadow: inset 0 0 0 1px rgba(201, 168, 118, 0.25), inset 0 0 0 2px rgba(111, 143, 168, 0.3);
+}
+
+.turn-row-dead {
+  opacity: 0.5;
+}
+
+.turn-row-dead .turn-row-name {
+  text-decoration: line-through;
+}
+
+.group-checkbox {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--steel-blue);
+  cursor: pointer;
+}
+
+.turn-row-init {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  color: var(--gold);
+  width: 30px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.turn-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.turn-row-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.active-marker {
+  color: var(--gold);
+  font-size: 0.85rem;
+}
+
+.dead-tag {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--red-blood);
+  border: 1px solid var(--red-blood-dim);
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.05em;
+}
+
+.turn-row-hp-text {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+/* =========================================================================
+   HP bars (shared between turn rows and detail panel)
+   ========================================================================= */
+
+.hp-bar {
+  width: 100%;
+  height: 7px;
+  background: var(--bg-ink);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+}
+
+.hp-bar-large {
+  height: 12px;
+  margin-bottom: 6px;
+}
+
+.hp-bar-fill {
+  height: 100%;
+  background: var(--green-heal);
+  transition: width 0.15s ease;
+}
+
+.hp-bar-fill-high {
+  background: var(--green-heal);
+}
+
+.hp-bar-fill-mid {
+  background: var(--gold-dim);
+}
+
+.hp-bar-fill-low {
+  background: var(--red-blood);
+}
+
+/* =========================================================================
+   Condition tags
+   ========================================================================= */
+
+.condition-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.condition-tag {
+  font-size: 0.68rem;
+  background: var(--bg-ink);
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  padding: 1px 6px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.condition-tag-removable {
+  color: var(--text-parchment);
+}
+
+.condition-remove {
+  background: none;
+  border: none;
+  color: var(--red-blood);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+  line-height: 1;
+}
+
+.condition-select {
+  margin-top: 8px;
+  width: 100%;
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-parchment);
+  padding: 6px;
+  font-size: 0.8rem;
+}
+
+/* =========================================================================
+   RIGHT PANEL: detail
+   ========================================================================= */
+
+.detail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.detail-header {
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 10px;
+}
+
+.detail-name {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--gold);
+  margin: 0 0 2px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.detail-stats {
+  display: flex;
+  gap: 10px;
+}
+
+.stat-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stat-box label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.stat-box input {
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-parchment);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  padding: 6px;
+  width: 100%;
+}
+
+.init-input-row {
+  display: flex;
+  gap: 4px;
+}
+
+.init-input-row input {
+  flex: 1;
+}
+
+.init-input-row .btn {
+  flex-shrink: 0;
+  padding: 6px 9px;
+}
+
+.detail-hp-block {
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 10px;
+}
+
+.hp-numbers {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  text-align: center;
+  margin-bottom: 8px;
+  color: var(--text-parchment);
+}
+
+.hp-btn-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.hp-btn {
+  flex: 1;
+  font-family: var(--font-mono);
+  padding: 7px 4px;
+  text-align: center;
+}
+
+.hp-btn-wide {
+  flex: 1 1 calc(50% - 3px);
+  font-family: var(--font-mono);
+}
+
+.hp-quick-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.hp-quick-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hp-quick-field label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.hp-quick-input-num {
+  width: 100%;
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-parchment);
+  font-family: var(--font-mono);
+  padding: 7px 4px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.hp-quick-input-num:focus-visible {
+  outline: 2px solid var(--gold);
+  border-color: var(--gold-dim);
+}
+
+.hp-quick-hint {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 4px;
+}
+
+.detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.detail-notes {
+  width: 100%;
+  min-height: 60px;
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-parchment);
+  padding: 8px;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  resize: vertical;
+}
+
+.trait-block {
+  font-size: 0.8rem;
+  color: var(--text-parchment);
+  line-height: 1.45;
+  margin-bottom: 6px;
+}
+
+.trait-name {
+  font-style: italic;
+  color: var(--gold);
+}
+
+.empty-hint {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  padding: 10px 4px;
+}
+
+.empty-hint-inline {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+/* =========================================================================
+   LEFT PANEL: library tabs (Monstra / Hráči)
+   ========================================================================= */
+
+.library-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.library-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  padding: 8px 6px;
+  font-size: 0.82rem;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.library-tab:hover {
+  color: var(--text-parchment);
+}
+
+.library-tab-active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+  font-weight: 600;
+}
+
+.library-tab-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.player-row .monster-row-meta {
+  font-family: var(--font-mono);
+}
+
+.player-init-input {
+  width: 54px;
+}
+
+/* =========================================================================
+   PC / MON source badges -- shared between turn rows, detail header, and
+   the floating stat block. Distinct hues so a DM can tell combatant type
+   apart at a glance without reading the text.
+   ========================================================================= */
+
+.source-badge {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.source-badge-pc {
+  background: rgba(111, 143, 168, 0.18);
+  color: var(--steel-blue);
+  border: 1px solid var(--steel-blue-dim);
+}
+
+.source-badge-mon {
+  background: rgba(168, 68, 68, 0.14);
+  color: #c98a8a;
+  border: 1px solid var(--red-blood-dim);
+}
+
+/* The ⓘ info button in each turn row: small, unobtrusive, doesn't compete
+   with the combatant name for attention until hovered. */
+.statblock-info-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.statblock-info-btn:hover {
+  color: var(--gold);
+}
+
+.remove-instance-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.remove-instance-btn:hover {
+  color: var(--red-blood);
+}
+
+.manual-init-tag {
+  font-size: 0.68rem;
+  color: var(--steel-blue);
+  border: 1px solid var(--steel-blue-dim);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* =========================================================================
+   Stat strip (bullet D) -- abilities + modifier + save bonus, passives,
+   speed, senses. Saves are visually emphasized since the DM looks them
+   up constantly mid-combat.
+   ========================================================================= */
+
+.stat-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-strip-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stat-strip-row {
+  display: grid;
+  grid-template-columns: 36px 28px 32px auto 40px;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.stat-strip-row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.stat-strip-ability {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.stat-strip-score {
+  color: var(--text-parchment);
+}
+
+.stat-strip-mod {
+  color: var(--text-muted);
+}
+
+.stat-strip-save-label {
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: right;
+}
+
+/* Saves get more visual weight than the raw ability score/modifier,
+   per the explicit request that the DM looks these up most often. */
+.stat-strip-save {
+  color: var(--gold);
+  font-weight: 700;
+  text-align: right;
+}
+
+.stat-strip-passives {
+  border-top: 1px solid var(--border-soft);
+  padding-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-strip-passive-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--text-parchment);
+}
+
+.stat-strip-passive-row span:first-child {
+  color: var(--text-muted);
+}
+
+/* =========================================================================
+   Accordion (bullet E) -- collapsible detail sections
+   ========================================================================= */
+
+.accordion-section {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.accordion-header {
+  width: 100%;
+  background: var(--bg-panel-raised);
+  border: none;
+  color: var(--text-parchment);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.accordion-header:hover {
+  background: var(--border-soft);
+}
+
+.accordion-arrow {
+  color: var(--gold-dim);
+  font-size: 0.7rem;
+  width: 10px;
+  flex-shrink: 0;
+}
+
+.accordion-body {
+  padding: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.skills-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.skill-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  padding: 2px 0;
+}
+
+.skill-row span:first-child {
+  color: var(--text-parchment);
+}
+
+.skill-row span:last-child {
+  font-family: var(--font-mono);
+  color: var(--gold-dim);
+}
+
+.resist-row {
+  display: flex;
+  gap: 8px;
+  font-size: 0.8rem;
+  margin-bottom: 4px;
+  line-height: 1.4;
+}
+
+.resist-label {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  min-width: 110px;
+}
+
+/* =========================================================================
+   Floating stat block popover (bullet F)
+   ========================================================================= */
+
+.statblock-popover {
+  position: fixed;
+  z-index: 1000;
+  width: 280px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--gold-dim);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.statblock-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-soft);
+  position: sticky;
+  top: 0;
+}
+
+.statblock-popover-title {
+  font-family: var(--font-display);
+  color: var(--gold);
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statblock-popover-header-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.statblock-popover-header-actions .btn {
+  padding: 3px 7px;
+  font-size: 0.78rem;
+}
+
+.statblock-popover-body {
+  padding: 10px;
+  font-size: 0.8rem;
+}
+
+.statblock-line {
+  margin-bottom: 8px;
+  color: var(--text-parchment);
+}
+
+.statblock-abilities {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.statblock-ability-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.statblock-ability-row span:first-child {
+  color: var(--text-muted);
+  width: 32px;
+}
+
+.statblock-save {
+  color: var(--gold);
+  margin-left: auto;
+}
+
+.statblock-section-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 8px 0 4px 0;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 6px;
+}
+
+
+
+/* =========================================================================
+   Responsive: stack columns below a usable tablet/laptop width.
+   The app is meant for a DM laptop/tablet at the table, so the floor
+   here is "fits a tablet in portrait" rather than a phone.
+   ========================================================================= */
+
+@media (max-width: 900px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    overflow-y: auto;
+  }
+
+  .panel {
+    max-height: none;
+  }
+
+  .header-shortcuts {
+    display: none;
+  }
+}

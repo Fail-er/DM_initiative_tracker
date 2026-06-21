@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DM Encounter Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="app-header">
+    <h1 class="app-title">DM Encounter Tracker</h1>
+    <div class="header-shortcuts">
+      <span><kbd>/</kbd> hledat</span>
+      <span><kbd>N</kbd> další monstrum</span>
+      <span><kbd>B</kbd> předchozí tah</span>
+      <span><kbd>K</kbd> dead</span>
+      <span><kbd>Del</kbd> odstranit</span>
+      <span><kbd>Esc</kbd> zrušit výběr</span>
+    </div>
+  </header>
+
+  <main class="app-layout">
+
+    <!-- LEFT PANEL: monster + player library, search, import -->
+    <section class="panel panel-left" aria-label="Knihovna">
+      <div class="library-tabs" role="tablist">
+        <button id="tab-monsters" class="library-tab library-tab-active" type="button" role="tab" aria-selected="true">Monstra</button>
+        <button id="tab-players" class="library-tab" type="button" role="tab" aria-selected="false">Hráči</button>
+      </div>
+
+      <div id="import-status" class="import-status" style="display:none"></div>
+
+      <!-- Monster tab content -->
+      <div id="monster-tab-content" class="library-tab-content">
+        <div class="panel-header">
+          <input
+            id="monster-search"
+            class="search-input"
+            type="text"
+            placeholder="Hledat podle jména, typu, CR, source..."
+            autocomplete="off"
+          />
+          <button id="import-library-btn" class="btn btn-small" type="button">Import JSON</button>
+          <input id="import-library-input" type="file" accept=".json,application/json" hidden />
+        </div>
+        <div id="monster-results" class="monster-results"></div>
+      </div>
+
+      <!-- Player tab content -->
+      <div id="player-tab-content" class="library-tab-content" style="display:none">
+        <div class="panel-header">
+          <button id="add-all-players-btn" class="btn btn-small btn-primary" type="button">Add All Players</button>
+        </div>
+        <div id="player-results" class="monster-results"></div>
+      </div>
+    </section>
+
+    <!-- MIDDLE PANEL: active encounter / turn order -->
+    <section class="panel panel-middle" aria-label="Encounter">
+      <div class="panel-header panel-header-encounter">
+        <h2 id="round-counter">Kolo 1</h2>
+        <div class="encounter-controls">
+          <button id="prev-turn-btn" class="btn" type="button" title="Předchozí tah (B)">&larr; Previous</button>
+          <button id="next-turn-btn" class="btn btn-primary" type="button" title="Posune tah na dalšího v pořadí (N)">Next Turn &rarr;</button>
+          <button id="next-round-btn" class="btn" type="button" title="Skočí na začátek pořadí a zvýší kolo">Next Round &raquo;</button>
+        </div>
+      </div>
+
+      <div class="panel-header panel-header-secondary">
+        <button id="roll-initiative-btn" class="btn btn-small" type="button" title="Hází jen monstrům bez iniciativy. Hráči se nikdy nepřehazují.">🎲 Roll Missing Initiative</button>
+        <button id="group-selected-btn" class="btn btn-small" type="button" disabled>Group Selected</button>
+        <span id="group-selection-hint" class="group-selection-hint">Vyber 2+ combatanty (checkbox nebo Ctrl/Shift+klik)</span>
+        <button id="new-encounter-btn" class="btn btn-small btn-danger" type="button">New Encounter</button>
+      </div>
+
+      <div class="panel-header panel-header-secondary">
+        <button id="export-encounter-btn" class="btn btn-small" type="button">Export Encounter</button>
+        <button id="import-encounter-btn" class="btn btn-small" type="button">Import Encounter</button>
+        <input id="import-encounter-input" type="file" accept=".json,application/json" hidden />
+      </div>
+
+      <div id="turn-list" class="turn-list"></div>
+    </section>
+
+    <!-- RIGHT PANEL: selected combatant detail -->
+    <section class="panel panel-right" aria-label="Detail combatanta">
+      <div id="detail-panel" class="detail-panel"></div>
+    </section>
+
+  </main>
+
+  <!-- Floating stat block popover (bullet F). Positioned dynamically near
+       the clicked ⓘ icon by ui.js. Hidden by default. -->
+  <div id="statblock-popover" class="statblock-popover" style="display:none" role="dialog" aria-label="Stat block">
+    <div class="statblock-popover-header">
+      <span id="statblock-popover-title" class="statblock-popover-title"></span>
+      <div class="statblock-popover-header-actions">
+        <button id="statblock-pin-btn" class="btn btn-small" type="button" title="Připnout (nezavře se kliknutím mimo)">📌</button>
+        <button id="statblock-close-btn" class="btn btn-small" type="button" aria-label="Zavřít">&times;</button>
+      </div>
+    </div>
+    <div id="statblock-popover-body" class="statblock-popover-body"></div>
+  </div>
+
+  <!-- Module scripts, loaded in dependency order. No bundler needed:
+       each file defines a global (MonsterLibrary, PlayerLibrary, Encounter,
+       Storage, UI) that the next file relies on. -->
+  <script src="js/data.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/encounter.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

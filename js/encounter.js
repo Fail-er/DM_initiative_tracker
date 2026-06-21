@@ -196,6 +196,51 @@ const Encounter = (() => {
     return state.instances.some((i) => i.sourceType === 'player' && i.templateId === templateId);
   }
 
+  /**
+   * Syncs a live player CombatantInstance with the latest PlayerTemplate
+   * from the library (bullet K). This is a deliberate, DM-triggered action
+   * (the "Sync selected player from library" button) -- it is never run
+   * automatically, so editing a player in Player Manager mid-fight never
+   * silently rewrites the live encounter.
+   *
+   * Updated from the template: displayName/publicName, armorClass, maxHp,
+   * initiativeBonus, speed (stored as part of the synced snapshot below),
+   * abilities, savingThrows, skills, passivePerception, passiveInsight,
+   * passiveInvestigation, senses, importantAbilities.
+   *
+   * Left COMPLETELY untouched: currentHp, tempHp, initiative,
+   * initiativeRolled, conditions, isDead, notes, groupId. In particular,
+   * if maxHp changes, currentHp is NOT clamped or rescaled here -- the DM
+   * adjusts it by hand afterwards if needed, per the spec.
+   *
+   * Note: abilities/savingThrows/skills/passives/importantAbilities/speed/
+   * senses aren't part of the original CombatantInstance shape (they live
+   * on the template and are read live via templateId lookups elsewhere in
+   * the UI). Storing a synced snapshot of them directly on the instance
+   * would duplicate state and risk drifting out of sync again. Since the
+   * detail panel and stat strip already resolve these through
+   * PlayerLibrary.getById(inst.templateId), syncing them really just means
+   * "make sure the instance points at the latest template data" -- which
+   * is already true by definition once the library itself has been
+   * updated and re-loaded. What DOES need explicit copying onto the
+   * instance is the small set of fields the instance keeps its own copy
+   * of for fast access: displayName/publicName, armorClass, maxHp,
+   * initiativeBonus.
+   */
+  function syncPlayerFromTemplate(instanceId, template) {
+    const inst = getInstance(instanceId);
+    if (!inst || !template || inst.sourceType !== 'player') return false;
+
+    inst.displayName = template.name;
+    inst.publicName = template.name;
+    inst.armorClass = template.armorClass;
+    inst.maxHp = template.maxHp;
+    inst.initiativeBonus = template.initiativeBonus || 0;
+    // currentHp, tempHp, initiative, initiativeRolled, conditions, isDead,
+    // notes, groupId are deliberately NOT touched above.
+    return true;
+  }
+
   function getInstance(instanceId) {
     return state.instances.find((i) => i.instanceId === instanceId) || null;
   }
@@ -448,6 +493,7 @@ const Encounter = (() => {
     addFromTemplate,
     addPlayerFromTemplate,
     hasPlayerInstance,
+    syncPlayerFromTemplate,
     getInstance,
     removeInstance,
     sortedInstances,

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Player Manager — DM Encounter Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="app-header">
+    <h1 class="app-title">Player Manager</h1>
+    <div class="header-shortcuts">
+      <a href="index.html" class="btn btn-small" id="back-to-tracker-btn">&larr; Zpět do trackeru</a>
+    </div>
+  </header>
+
+  <main class="editor-layout">
+
+    <!-- LEFT PANEL: player list -->
+    <section class="panel panel-left" aria-label="Seznam hráčů">
+      <div class="panel-header">
+        <h2>Hráči</h2>
+        <button id="new-player-btn" class="btn btn-small btn-primary" type="button">+ Nový hráč</button>
+      </div>
+      <div id="import-status" class="import-status" style="display:none"></div>
+      <div id="player-list" class="monster-results"></div>
+
+      <div class="editor-sidebar-actions">
+        <button id="export-players-btn" class="btn btn-small" type="button">Export Players JSON</button>
+        <button id="import-players-btn" class="btn btn-small" type="button">Import Players JSON</button>
+        <input id="import-players-input" type="file" accept=".json,application/json" hidden />
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: editor form -->
+    <section class="panel panel-right editor-form-panel" aria-label="Editor hráče">
+      <div id="editor-empty-state" class="empty-hint">Vyber hráče vlevo, nebo klikni na "Nový hráč".</div>
+
+      <form id="player-form" class="player-form" style="display:none">
+        <div class="editor-form-actions">
+          <button id="save-player-btn" type="button" class="btn btn-primary">Uložit</button>
+          <button id="save-copy-btn" type="button" class="btn">Uložit jako kopii</button>
+          <button id="delete-player-btn" type="button" class="btn btn-danger">Smazat</button>
+          <button id="revert-player-btn" type="button" class="btn">Zrušit změny</button>
+        </div>
+
+        <!-- Basic -->
+        <fieldset class="form-fieldset">
+          <legend>Basic</legend>
+          <div class="form-grid form-grid-2">
+            <label class="form-field">Name
+              <input type="text" id="f-name" required />
+            </label>
+            <label class="form-field">Class / Description
+              <input type="text" id="f-className" />
+            </label>
+            <label class="form-field">Level
+              <input type="number" id="f-level" min="1" max="20" value="1" />
+            </label>
+            <label class="form-field">Armor Class
+              <input type="number" id="f-armorClass" value="10" />
+            </label>
+            <label class="form-field">Max HP
+              <input type="number" id="f-maxHp" value="10" />
+            </label>
+            <label class="form-field">Current HP
+              <input type="number" id="f-currentHp" value="10" />
+            </label>
+            <label class="form-field">Temp HP
+              <input type="number" id="f-tempHp" value="0" />
+            </label>
+            <label class="form-field">Speed
+              <input type="text" id="f-speed" value="30 ft." />
+            </label>
+            <label class="form-field form-field-wide">Senses
+              <input type="text" id="f-senses" placeholder="např. Darkvision 60 ft." />
+            </label>
+          </div>
+          <p class="form-id-hint">ID: <code id="f-id-display">–</code> <span class="form-id-note">(stabilní, nemění se automaticky)</span></p>
+        </fieldset>
+
+        <!-- Abilities -->
+        <fieldset class="form-fieldset">
+          <legend>Abilities</legend>
+          <div class="ability-grid" id="ability-grid"></div>
+        </fieldset>
+
+        <!-- Saving Throw Proficiencies -->
+        <fieldset class="form-fieldset">
+          <legend>Saving Throw Proficiencies</legend>
+          <div class="save-grid" id="save-grid"></div>
+        </fieldset>
+
+        <!-- Initiative -->
+        <fieldset class="form-fieldset">
+          <legend>Initiative</legend>
+          <div class="form-grid form-grid-2">
+            <label class="form-field">Initiative misc bonus
+              <input type="number" id="f-initiativeMisc" value="0" />
+            </label>
+            <div class="computed-readout">
+              Výsledný initiative bonus: <strong id="computed-initiative">+0</strong>
+            </div>
+          </div>
+        </fieldset>
+
+        <!-- Passive Skills -->
+        <fieldset class="form-fieldset">
+          <legend>Passive Skills</legend>
+          <div class="passive-grid" id="passive-grid"></div>
+        </fieldset>
+
+        <!-- Important Abilities -->
+        <fieldset class="form-fieldset">
+          <legend>Important Abilities</legend>
+          <div id="abilities-list" class="abilities-list"></div>
+          <button type="button" id="add-ability-btn" class="btn btn-small">+ Přidat schopnost</button>
+        </fieldset>
+
+        <!-- Notes -->
+        <fieldset class="form-fieldset">
+          <legend>Notes</legend>
+          <textarea id="f-notes" class="detail-notes" rows="3"></textarea>
+        </fieldset>
+      </form>
+    </section>
+
+  </main>
+
+  <script src="js/storage.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/player-editor.js"></script>
+</body>
+</html>

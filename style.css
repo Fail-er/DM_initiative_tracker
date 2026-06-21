@@ -398,7 +398,7 @@ body {
   opacity: 0.5;
 }
 
-.turn-row-dead .turn-row-name {
+.turn-row-dead .turn-row-name-text {
   text-decoration: line-through;
 }
 
@@ -1117,6 +1117,354 @@ body {
 
 
 /* =========================================================================
+   Player Editor (player-editor.html) -- two-column layout, form styling
+   ========================================================================= */
+
+.editor-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 1px;
+  overflow: hidden;
+  background: var(--border-soft);
+}
+
+.editor-form-panel {
+  overflow-y: auto;
+}
+
+.editor-sidebar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.player-list-row {
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.player-list-row:hover {
+  border-color: var(--border-strong);
+}
+
+.player-list-row-selected {
+  border-color: var(--steel-blue);
+  background: #1f2a30;
+}
+
+.editor-form-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.player-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-fieldset {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  background: var(--bg-panel-raised);
+}
+
+.form-fieldset legend {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--gold);
+  padding: 0 6px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.form-grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.form-field-wide {
+  grid-column: 1 / -1;
+}
+
+.form-field input,
+.form-field textarea {
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-parchment);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  padding: 7px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.form-id-hint {
+  margin: 10px 0 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.form-id-hint code {
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  color: var(--gold-dim);
+  font-family: var(--font-mono);
+}
+
+.form-id-note {
+  font-style: italic;
+}
+
+/* ---- Ability grid ---- */
+
+.ability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.ability-field {
+  gap: 4px;
+}
+
+.ability-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ability-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ability-mod-readout {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--gold);
+  font-weight: 700;
+  flex-shrink: 0;
+  width: 32px;
+  text-align: right;
+}
+
+/* ---- Saving throw grid ---- */
+
+.save-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.save-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.save-row-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-parchment);
+  text-transform: none;
+  letter-spacing: normal;
+  flex: 1;
+  min-width: 160px;
+}
+
+.save-row-checkbox input {
+  accent-color: var(--steel-blue);
+  width: 15px;
+  height: 15px;
+}
+
+.save-row-misc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.save-row-misc input {
+  width: 50px;
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-parchment);
+  font-family: var(--font-mono);
+  padding: 4px;
+}
+
+.save-row-readout {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--gold);
+  font-weight: 700;
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ---- Initiative computed readout ---- */
+
+.computed-readout {
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--text-parchment);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.computed-readout strong {
+  color: var(--gold);
+  font-family: var(--font-mono);
+  margin-left: 6px;
+  font-size: 1rem;
+}
+
+/* ---- Passive skills grid ---- */
+
+.passive-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.passive-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.passive-row-label {
+  flex: 1;
+  min-width: 100px;
+  font-size: 0.8rem;
+  color: var(--text-parchment);
+}
+
+.passive-mode-select {
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-parchment);
+  font-size: 0.78rem;
+  padding: 5px;
+}
+
+.passive-misc-field,
+.passive-override-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.passive-misc-field input,
+.passive-override-field input {
+  width: 50px;
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-parchment);
+  font-family: var(--font-mono);
+  padding: 4px;
+}
+
+.passive-misc-field input:disabled,
+.passive-override-field input:disabled {
+  opacity: 0.35;
+}
+
+.passive-row-readout {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--gold);
+  font-weight: 700;
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ---- Important abilities list ---- */
+
+.abilities-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.important-ability-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.important-ability-row .ability-name-input {
+  flex: 0 0 160px;
+}
+
+.important-ability-row .ability-text-input {
+  flex: 1;
+}
+
+.important-ability-row input {
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-parchment);
+  font-size: 0.8rem;
+  padding: 6px;
+}
+
+.ability-remove-btn {
+  flex-shrink: 0;
+  padding: 5px 9px;
+}
+
+/* ---- Sync button in the tracker's player detail panel (bullet K) ---- */
+
+.sync-player-btn {
+  width: 100%;
+  text-align: center;
+}
+
+/* =========================================================================
    Responsive: stack columns below a usable tablet/laptop width.
    The app is meant for a DM laptop/tablet at the table, so the floor
    here is "fits a tablet in portrait" rather than a phone.
@@ -1126,6 +1474,12 @@ body {
   .app-layout {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto auto;
+    overflow-y: auto;
+  }
+
+  .editor-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
     overflow-y: auto;
   }
 

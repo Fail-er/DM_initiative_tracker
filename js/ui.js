@@ -58,6 +58,7 @@ const UI = (() => {
 
       playerResults: document.getElementById('player-results'),
       addAllPlayersBtn: document.getElementById('add-all-players-btn'),
+      reloadPlayersBtn: document.getElementById('reload-players-btn'),
 
       turnList: document.getElementById('turn-list'),
       roundCounter: document.getElementById('round-counter'),
@@ -352,6 +353,27 @@ const UI = (() => {
     }
   }
 
+  /** Re-reads the player library from localStorage and re-renders the
+   *  Hráči tab (bullet B). This picks up changes made in Player Manager
+   *  (player-editor.html), whether opened in another tab/window (where
+   *  the 'storage' event fires automatically) or this same session
+   *  (where the manual Reload Players button is the fallback). Does NOT
+   *  touch any already-added CombatantInstances in the live encounter --
+   *  that only happens via the explicit per-combatant Sync button. */
+  function reloadPlayersFromStorage() {
+    const saved = Storage.loadPlayers();
+    if (saved && Array.isArray(saved.players)) {
+      PlayerLibrary.loadFromJson(saved, true);
+      renderPlayerResults();
+      // If the detail panel is currently showing a player, its stat strip
+      // reads live from PlayerLibrary.getById(), so refresh it too.
+      if (selectedInstanceId) {
+        const inst = Encounter.getInstance(selectedInstanceId);
+        if (inst && inst.sourceType === 'player') renderDetail();
+      }
+    }
+  }
+
   // -------------------------------------------------------------------
   // MIDDLE PANEL: turn order list
   // -------------------------------------------------------------------
@@ -409,7 +431,7 @@ const UI = (() => {
           <div class="turn-row-name">
             ${isActive ? '<span class="active-marker" title="Aktivní tah">&#9876;</span>' : ''}
             <span class="${badgeClass}">${badgeText}</span>
-            ${escapeHtml(inst.publicName || inst.displayName)}
+            <span class="turn-row-name-text">${escapeHtml(inst.publicName || inst.displayName)}</span>
             ${inst.isDead ? '<span class="dead-tag">DEAD</span>' : ''}
             <button class="statblock-info-btn" type="button" data-instance-id="${inst.instanceId}" title="Stat block" aria-label="Zobrazit stat block">ⓘ</button>
             <button class="remove-instance-btn" type="button" data-instance-id="${inst.instanceId}" title="Odstranit z encounteru (Delete)" aria-label="Odstranit z encounteru">🗑</button>
@@ -701,6 +723,13 @@ const UI = (() => {
 
     const quickStatsHtml = renderQuickStatsAndHp(inst, subtitle);
 
+    const syncButtonHtml = `
+      <button id="sync-player-btn" class="btn btn-small sync-player-btn" type="button"
+        title="Aktualizuje AC, max HP, initiative bonus a staty z knihovny. Nezmění currentHP, iniciativu ani stavy.">
+        ⟲ Sync selected player from library
+      </button>
+    `;
+
     let accordionHtml = '';
     if (tpl) {
       const statStripHtml = renderStatStrip(
@@ -723,7 +752,18 @@ const UI = (() => {
     const notesHtml = `<textarea id="detail-notes" class="detail-notes" placeholder="Poznámky...">${escapeHtml(notesValue)}</textarea>`;
     accordionHtml += renderAccordionSection('notes', 'Notes', false, notesHtml);
 
-    el.detailPanel.innerHTML = quickStatsHtml + accordionHtml;
+    el.detailPanel.innerHTML = quickStatsHtml + syncButtonHtml + accordionHtml;
+
+    const syncBtn = document.getElementById('sync-player-btn');
+    syncBtn.addEventListener('click', () => {
+      const freshTpl = PlayerLibrary.getById(inst.templateId);
+      if (!freshTpl) {
+        alert(`Šablona hráče "${inst.templateId}" nebyla v knihovně nalezena. Zkus nejdřív Reload Players.`);
+        return;
+      }
+      Encounter.syncPlayerFromTemplate(inst.instanceId, freshTpl);
+      persistAndRerenderEncounter();
+    });
   }
 
   // ---- Shared accordion-section content renderers -----------------------
@@ -1009,6 +1049,19 @@ const UI = (() => {
     el.tabPlayers.addEventListener('click', () => switchLibraryTab('players'));
 
     el.addAllPlayersBtn.addEventListener('click', handleAddAllPlayers);
+    el.reloadPlayersBtn.addEventListener('click', reloadPlayersFromStorage);
+
+    // Bullet B: auto-reload when another tab/window (typically
+    // player-editor.html) writes to the players localStorage key. The
+    // 'storage' event only fires in OTHER tabs/windows, never the one
+    // that made the write -- which is exactly right here, since this is
+    // for picking up changes made elsewhere, not reacting to our own
+    // writes from "Add All Players" etc.
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'dnd-tracker:players') {
+        reloadPlayersFromStorage();
+      }
+    });
 
     el.nextTurnBtn.addEventListener('click', () => {
       Encounter.nextTurn();

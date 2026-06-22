@@ -10,8 +10,26 @@
 
   <header class="app-header">
     <h1 class="app-title">DM Encounter Tracker</h1>
+
+    <div class="spellbook-search-container">
+      <div class="spellbook-search-row">
+        <input
+          id="spellbook-search-input"
+          class="spellbook-search-input"
+          type="text"
+          placeholder="Spellbook"
+          autocomplete="off"
+          aria-label="Vyhledat kouzlo"
+        />
+        <button id="spellbook-import-btn" class="btn btn-small" type="button" title="Import Spells JSON">📥</button>
+        <input id="spellbook-import-input" type="file" accept=".json,application/json" hidden />
+      </div>
+      <div id="spellbook-results" class="spellbook-results" style="display:none"></div>
+    </div>
+
     <div class="header-shortcuts">
       <span><kbd>/</kbd> hledat</span>
+      <span><kbd>Alt+S</kbd> spellbook</span>
       <span><kbd>N</kbd> další monstrum</span>
       <span><kbd>B</kbd> předchozí tah</span>
       <span><kbd>K</kbd> dead</span>
@@ -105,14 +123,29 @@
     <div id="statblock-popover-body" class="statblock-popover-body"></div>
   </div>
 
+  <!-- Floating spell card (bullet C). Internal panel, not a new window.
+       Positioned centrally by spell-ui.js. Hidden by default. -->
+  <div id="spell-card" class="spell-card" style="display:none" role="dialog" aria-label="Spell card">
+    <div class="spell-card-header">
+      <span id="spell-card-title" class="spell-card-title"></span>
+      <div class="spell-card-header-actions">
+        <button id="spell-card-pin-btn" class="btn btn-small" type="button" title="Připnout (nezavře se kliknutím mimo)">📌</button>
+        <button id="spell-card-close-btn" class="btn btn-small" type="button" aria-label="Zavřít">&times;</button>
+      </div>
+    </div>
+    <div id="spell-card-body" class="spell-card-body"></div>
+  </div>
+
   <!-- Module scripts, loaded in dependency order. No bundler needed:
        each file defines a global (MonsterLibrary, PlayerLibrary, Encounter,
-       Storage, UI) that the next file relies on. -->
+       Storage, UI, SpellLibrary, SpellUI) that the next file relies on. -->
   <script src="js/data.js"></script>
   <script src="js/player.js"></script>
+  <script src="js/spell.js"></script>
   <script src="js/encounter.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/spell-ui.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

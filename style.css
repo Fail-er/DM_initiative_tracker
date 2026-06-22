@@ -68,12 +68,14 @@ body {
 
 .app-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  gap: 16px;
   padding: 14px 20px;
   background: linear-gradient(180deg, var(--bg-panel-raised), var(--bg-panel));
   border-bottom: 2px solid var(--border-strong);
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .app-title {
@@ -83,6 +85,7 @@ body {
   color: var(--gold);
   margin: 0;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .header-shortcuts {
@@ -90,6 +93,7 @@ body {
   gap: 14px;
   font-size: 0.75rem;
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .header-shortcuts kbd {
@@ -100,6 +104,238 @@ body {
   font-family: var(--font-mono);
   color: var(--gold-dim);
   margin-right: 3px;
+}
+
+/* =========================================================================
+   Spellbook header search (bullets A, B, J)
+   ========================================================================= */
+
+.spellbook-search-container {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  max-width: 360px;
+}
+
+.spellbook-search-row {
+  display: flex;
+  gap: 6px;
+}
+
+.spellbook-search-input {
+  flex: 1;
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-parchment);
+  padding: 7px 10px;
+  font-size: 0.85rem;
+  font-family: var(--font-body);
+  min-width: 0;
+}
+
+.spellbook-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.spellbook-search-input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+  border-color: var(--gold-dim);
+}
+
+/* Floating results overlay: positioned absolutely beneath the search row
+   so it never permanently changes the header's height (bullet J). High
+   z-index, since it must sit above the three-column layout below it. */
+.spellbook-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 1100;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--gold-dim);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.spellbook-hint {
+  padding: 10px 12px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.spellbook-result-row {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.spellbook-result-row:last-child {
+  border-bottom: none;
+}
+
+.spellbook-result-row:hover,
+.spellbook-result-row-highlighted {
+  background: #2e2718; /* same highlight tone as the active-turn row, for visual consistency */
+}
+
+.spellbook-result-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gold);
+  margin-bottom: 2px;
+}
+
+.spellbook-result-summary {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* =========================================================================
+   Floating spell card (bullet C) -- mirrors the stat block popover's
+   structure (header with title + pin/close, scrollable body) but reads
+   as its own surface: centered rather than anchored to a click point,
+   since it's opened from the header rather than a specific row.
+   ========================================================================= */
+
+.spell-card {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  width: 360px;
+  max-height: 75vh;
+  overflow-y: auto;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--gold-dim);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+.spell-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-soft);
+  position: sticky;
+  top: 0;
+}
+
+.spell-card-title {
+  font-family: var(--font-display);
+  color: var(--gold);
+  font-size: 1rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spell-card-header-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.spell-card-header-actions .btn {
+  padding: 3px 7px;
+  font-size: 0.78rem;
+}
+
+.spell-card-body {
+  padding: 12px;
+  font-size: 0.82rem;
+}
+
+.spell-card-subtitle {
+  color: var(--text-parchment);
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.spell-card-source {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.spell-card-tags {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.spell-card-tag {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.spell-card-tag-conc {
+  background: rgba(111, 143, 168, 0.18);
+  color: var(--steel-blue);
+  border: 1px solid var(--steel-blue-dim);
+}
+
+.spell-card-tag-ritual {
+  background: rgba(201, 168, 118, 0.15);
+  color: var(--gold);
+  border: 1px solid var(--gold-dim);
+}
+
+.spell-card-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  margin-bottom: 12px;
+}
+
+.spell-card-line {
+  display: flex;
+  gap: 8px;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.spell-card-line-label {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  min-width: 100px;
+}
+
+.spell-card-description {
+  line-height: 1.5;
+}
+
+.spell-card-entry {
+  margin: 0 0 8px 0;
+  color: var(--text-parchment);
+}
+
+.spell-card-higher-level {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-parchment);
+  font-size: 0.8rem;
+}
+
+.spell-card-higher-level strong {
+  color: var(--gold);
 }
 
 /* =========================================================================
@@ -274,12 +510,19 @@ body {
 }
 
 .monster-row-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--text-parchment);
+}
+
+.monster-row-name-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .monster-row-meta {
@@ -829,6 +1072,13 @@ body {
   padding: 0 2px;
   line-height: 1;
   flex-shrink: 0;
+}
+
+/* In the turn list (wider row), push the info/remove buttons to the
+   row's right edge instead of sitting right after the name. In the
+   library list (tight flex container around just the name) this isn't
+   applied, so the button sits naturally right after the name. */
+.turn-row-name .statblock-info-btn {
   margin-left: auto;
 }
 
@@ -1489,5 +1739,15 @@ body {
 
   .header-shortcuts {
     display: none;
+  }
+
+  .spellbook-search-container {
+    max-width: none;
+    flex-basis: 100%;
+  }
+
+  .spell-card {
+    width: calc(100vw - 32px);
+    max-width: 360px;
   }
 }

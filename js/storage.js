@@ -10,6 +10,7 @@ const Storage = (() => {
   const ENCOUNTER_KEY = 'dnd-tracker:encounter';
   const LIBRARY_KEY = 'dnd-tracker:library';
   const PLAYERS_KEY = 'dnd-tracker:players';
+  const SPELLS_KEY = 'dnd-tracker:spells';
 
   function saveEncounter(state) {
     try {
@@ -65,6 +66,24 @@ const Storage = (() => {
     }
   }
 
+  function saveSpells(templates) {
+    try {
+      localStorage.setItem(SPELLS_KEY, JSON.stringify({ spells: templates }));
+    } catch (e) {
+      console.error('Nepodařilo se uložit knihovnu kouzel do localStorage:', e);
+    }
+  }
+
+  function loadSpells() {
+    try {
+      const raw = localStorage.getItem(SPELLS_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      console.error('Nepodařilo se načíst knihovnu kouzel z localStorage:', e);
+      return null;
+    }
+  }
+
   /** Triggers a browser download of the given object as a pretty-printed JSON file. */
   function downloadJson(obj, filename) {
     const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
@@ -109,6 +128,8 @@ const Storage = (() => {
     loadLibrary,
     savePlayers,
     loadPlayers,
+    saveSpells,
+    loadSpells,
     downloadJson,
     readJsonFile,
   };

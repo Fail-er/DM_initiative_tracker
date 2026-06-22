@@ -24,10 +24,15 @@ const UI = (() => {
   // Which left-panel library tab is showing.
   let activeLibraryTab = 'monsters'; // 'monsters' | 'players'
 
-  // Per-row pending initiative values typed into the player library's
-  // inline initiative input, keyed by player templateId. Lets the DM type
-  // "17", hit Enter or click Add, without this living in the template itself.
-  let pendingPlayerInitiative = new Map();
+  // Tracks players whose library row is currently in "awaiting initiative"
+  // mode: a player was just added via the Add button (with initiative
+  // null) and the row is showing a single focused input + confirm button
+  // in place of the normal Add control, until the DM types a value and
+  // commits it. Keyed by player templateId -> the instanceId that was
+  // just created, so confirming knows exactly which CombatantInstance to
+  // update even if multiple players are mid-add at once (a common
+  // scenario at the start of a fight).
+  let awaitingInitiativeFor = new Map();
 
   // Which accordion sections are open in the detail panel, keyed by
   // section key (see ACCORDION_DEFAULTS). Persists across re-renders
@@ -40,6 +45,11 @@ const UI = (() => {
   // Floating stat block popover state.
   let statblockPinned = false;
   let statblockOpenForId = null;
+  // When the open popover is a library-template preview (not a live
+  // encounter combatant), this holds { sourceType, templateId } instead.
+  // The two are mutually exclusive -- only one of statblockOpenForId /
+  // statblockOpenForTemplate is ever non-null at a time.
+  let statblockOpenForTemplate = null;
 
   // ---- DOM refs (filled in init) ----
   let el = {};
@@ -222,7 +232,10 @@ const UI = (() => {
       row.className = 'monster-row';
       row.innerHTML = `
         <div class="monster-row-info">
-          <span class="monster-row-name">${escapeHtml(tpl.name)}</span>
+          <span class="monster-row-name">
+            <span class="monster-row-name-text">${escapeHtml(tpl.name)}</span>
+            <button class="statblock-info-btn" type="button" title="Stat block" aria-label="Zobrazit stat block">ⓘ</button>
+          </span>
           <span class="monster-row-meta">${escapeHtml(tpl.type)} &middot; CR ${escapeHtml(tpl.challengeRating)} &middot; ${escapeHtml(tpl.source)}</span>
         </div>
         <div class="monster-row-actions">
@@ -232,6 +245,12 @@ const UI = (() => {
       `;
       const qtyInput = row.querySelector('.qty-input');
       const addBtn = row.querySelector('.btn-add');
+      const infoBtn = row.querySelector('.statblock-info-btn');
+
+      infoBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openLibraryStatblockPopover('monster', tpl.id, infoBtn);
+      });
 
       addBtn.addEventListener('click', () => {
         const count = parseInt(qtyInput.value, 10) || 1;
@@ -292,59 +311,98 @@ const UI = (() => {
     players.forEach((p) => {
       const row = document.createElement('div');
       row.className = 'monster-row player-row';
-      const pendingInit = pendingPlayerInitiative.has(p.id) ? pendingPlayerInitiative.get(p.id) : '';
+      const awaitingInstanceId = awaitingInitiativeFor.get(p.id);
+      const alreadyAdded = !awaitingInstanceId && Encounter.hasPlayerInstance(p.id);
+
+      let actionsHtml;
+      if (awaitingInstanceId) {
+        actionsHtml = `
+          <input type="number" class="qty-input player-init-input" placeholder="Init" aria-label="Iniciativa pro ${escapeHtml(p.name)}" />
+          <button class="btn btn-add btn-primary" type="button">✓</button>
+        `;
+      } else if (alreadyAdded) {
+        // Disabled, muted Add button: doubles as a checklist indicator of
+        // who's already in the encounter, and a hard block against adding
+        // the same player twice (no click handler is even attached below).
+        actionsHtml = `<button class="btn btn-add" type="button" disabled title="${escapeHtml(p.name)} je už v encounteru">Added &#10003;</button>`;
+      } else {
+        actionsHtml = `<button class="btn btn-add" type="button">Add</button>`;
+      }
 
       row.innerHTML = `
         <div class="monster-row-info">
-          <span class="monster-row-name">${escapeHtml(p.name)}</span>
+          <span class="monster-row-name">
+            <span class="monster-row-name-text">${escapeHtml(p.name)}</span>
+            <button class="statblock-info-btn" type="button" title="Stat block" aria-label="Zobrazit stat block">ⓘ</button>
+          </span>
           <span class="monster-row-meta">${escapeHtml(p.className)} ${p.level} &middot; AC ${p.armorClass} &middot; HP ${p.currentHp}/${p.maxHp}</span>
         </div>
-        <div class="monster-row-actions">
-          <input type="number" class="qty-input player-init-input" placeholder="Init" value="${pendingInit}" aria-label="Iniciativa pro ${escapeHtml(p.name)}" />
-          <button class="btn btn-add" type="button">Add</button>
-        </div>
+        <div class="monster-row-actions">${actionsHtml}</div>
       `;
 
-      const initInput = row.querySelector('.player-init-input');
-      const addBtn = row.querySelector('.btn-add');
-
-      // Workflow from bullet A: DM asks "Zápal?", player answers "17", DM
-      // types it here and hits Enter or clicks Add -- either commits.
-      const commitAdd = () => {
-        const raw = initInput.value.trim();
-        const value = raw === '' ? null : parseInt(raw, 10);
-        const inst = Encounter.addPlayerFromTemplate(p, Number.isFinite(value) ? value : null);
-        pendingPlayerInitiative.delete(p.id);
-        selectedInstanceId = inst.instanceId;
-        persistAndRerenderEncounter();
-        renderPlayerResults();
-      };
-
-      initInput.addEventListener('input', () => {
-        pendingPlayerInitiative.set(p.id, initInput.value);
+      const infoBtn = row.querySelector('.statblock-info-btn');
+      infoBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openLibraryStatblockPopover('player', p.id, infoBtn);
       });
-      initInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') commitAdd();
-      });
-      addBtn.addEventListener('click', commitAdd);
+
+      if (awaitingInstanceId) {
+        // Row is in "awaiting initiative" mode: the player is already in
+        // the encounter (added with initiative null the moment Add was
+        // clicked); this input only ever sets initiative on that existing
+        // instance, it never adds another copy.
+        const initInput = row.querySelector('.player-init-input');
+        const confirmBtn = row.querySelector('.btn-add');
+
+        const commitInitiative = () => {
+          const raw = initInput.value.trim();
+          const value = raw === '' ? null : parseInt(raw, 10);
+          if (Number.isFinite(value)) {
+            Encounter.setInitiative(awaitingInstanceId, value);
+          }
+          awaitingInitiativeFor.delete(p.id);
+          persistAndRerenderEncounter();
+          renderPlayerResults();
+        };
+
+        initInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') commitInitiative();
+        });
+        confirmBtn.addEventListener('click', commitInitiative);
+
+        // Autofocus so the DM can type the number immediately without an
+        // extra click -- this is the whole point of the change.
+        requestAnimationFrame(() => initInput.focus());
+      } else if (!alreadyAdded) {
+        // Normal mode: Add immediately creates the CombatantInstance with
+        // initiative null and flips this row into "awaiting initiative".
+        const addBtn = row.querySelector('.btn-add');
+        addBtn.addEventListener('click', () => {
+          const inst = Encounter.addPlayerFromTemplate(p, null);
+          awaitingInitiativeFor.set(p.id, inst.instanceId);
+          selectedInstanceId = inst.instanceId;
+          persistAndRerenderEncounter();
+          renderPlayerResults();
+        });
+      }
+      // alreadyAdded case: button is disabled, no handler needed.
 
       el.playerResults.appendChild(row);
     });
   }
 
   /** Add All Players (bullet A): adds every player template not already
-   *  present in the encounter (matched by templateId, per the agreed
-   *  behavior), using whatever initiative each has pending in its inline
-   *  input -- or blank/null if the DM hasn't typed one in for that PC yet. */
+   *  present in the encounter (matched by templateId), each with no
+   *  initiative set yet. The DM fills initiative in afterward per-combatant
+   *  in the right-hand detail panel -- bulk-adding doesn't try to pop up
+   *  an input for each one in turn, since that would be slower than just
+   *  asking each player in sequence and using the single-Add flow below. */
   function handleAddAllPlayers() {
     const players = PlayerLibrary.getAll();
     let addedCount = 0;
     players.forEach((p) => {
       if (Encounter.hasPlayerInstance(p.id)) return;
-      const raw = pendingPlayerInitiative.get(p.id);
-      const value = raw != null && raw.trim() !== '' ? parseInt(raw, 10) : null;
-      Encounter.addPlayerFromTemplate(p, Number.isFinite(value) ? value : null);
-      pendingPlayerInitiative.delete(p.id);
+      Encounter.addPlayerFromTemplate(p, null);
       addedCount++;
     });
     if (addedCount > 0) {
@@ -911,30 +969,28 @@ const UI = (() => {
   // Floating stat block popover (bullet F)
   // -------------------------------------------------------------------
 
-  /** Builds the floating stat block body for a combatant: name, AC, HP,
-   *  speed, abilities, saves, passive perception, resistances/immunities,
-   *  and actions -- a condensed read-only reference, separate from the
-   *  full editable accordion in the right panel. */
-  function buildStatblockBody(inst) {
-    if (inst.sourceType === 'player') {
-      const tpl = PlayerLibrary.getById(inst.templateId);
-      if (!tpl) return '<p class="empty-hint">Šablona nenalezena.</p>';
-      const abilityRows = ABILITY_KEYS.map((key) => {
-        const score = tpl.abilities[key];
-        const mod = abilityMod(score);
-        const save = Number.isFinite(tpl.savingThrows[key]) ? tpl.savingThrows[key] : mod;
-        return `<div class="statblock-ability-row"><span>${ABILITY_LABELS[key]}</span><span>${score} (${fmtMod(mod)})</span><span class="statblock-save">Save ${fmtMod(save)}</span></div>`;
-      }).join('');
-      return `
-        <div class="statblock-line"><strong>AC</strong> ${tpl.armorClass} &middot; <strong>HP</strong> ${inst.currentHp}/${inst.maxHp} &middot; <strong>Speed</strong> ${escapeHtml(tpl.speed)}</div>
-        <div class="statblock-abilities">${abilityRows}</div>
-        <div class="statblock-line"><strong>Passive Perception</strong> ${tpl.passivePerception}</div>
-        ${tpl.importantAbilities.length ? `<div class="statblock-section-title">Important Abilities</div>${renderNamedTextList(tpl.importantAbilities)}` : ''}
-      `;
-    }
+  /** Builds the floating stat block body from a PlayerTemplate. hpText is
+   *  the already-formatted HP string to show -- callers pass either a live
+   *  combatant's "current/max" or, for a library-only lookup with no
+   *  CombatantInstance yet, the template's own currentHp/maxHp as a
+   *  preview (bullet: "look before adding to the tracker"). */
+  function buildStatblockBodyForPlayerTemplate(tpl, hpText) {
+    const abilityRows = ABILITY_KEYS.map((key) => {
+      const score = tpl.abilities[key];
+      const mod = abilityMod(score);
+      const save = Number.isFinite(tpl.savingThrows[key]) ? tpl.savingThrows[key] : mod;
+      return `<div class="statblock-ability-row"><span>${ABILITY_LABELS[key]}</span><span>${score} (${fmtMod(mod)})</span><span class="statblock-save">Save ${fmtMod(save)}</span></div>`;
+    }).join('');
+    return `
+      <div class="statblock-line"><strong>AC</strong> ${tpl.armorClass} &middot; <strong>HP</strong> ${hpText} &middot; <strong>Speed</strong> ${escapeHtml(tpl.speed)}</div>
+      <div class="statblock-abilities">${abilityRows}</div>
+      <div class="statblock-line"><strong>Passive Perception</strong> ${tpl.passivePerception}</div>
+      ${tpl.importantAbilities.length ? `<div class="statblock-section-title">Important Abilities</div>${renderNamedTextList(tpl.importantAbilities)}` : ''}
+    `;
+  }
 
-    const tpl = MonsterLibrary.getById(inst.templateId);
-    if (!tpl) return '<p class="empty-hint">Šablona nenalezena.</p>';
+  /** Same as above, for a MonsterTemplate. */
+  function buildStatblockBodyForMonsterTemplate(tpl, hpText) {
     const abilityRows = ABILITY_KEYS.map((key) => {
       const score = tpl.abilities[key];
       const mod = abilityMod(score);
@@ -943,7 +999,7 @@ const UI = (() => {
     }).join('');
     const resist = renderResistancesBlock(tpl.resistances, tpl.immunities, []);
     return `
-      <div class="statblock-line"><strong>AC</strong> ${tpl.armorClass} &middot; <strong>HP</strong> ${inst.currentHp}/${inst.maxHp} &middot; <strong>Speed</strong> ${escapeHtml(tpl.speed)}</div>
+      <div class="statblock-line"><strong>AC</strong> ${tpl.armorClass} &middot; <strong>HP</strong> ${hpText} &middot; <strong>Speed</strong> ${escapeHtml(tpl.speed)}</div>
       <div class="statblock-abilities">${abilityRows}</div>
       <div class="statblock-line"><strong>Passive Perception</strong> ${passivePerceptionFromSkills(tpl)}</div>
       ${resist ? `<div class="statblock-section-title">Resistances / Immunities</div>${resist}` : ''}
@@ -951,18 +1007,69 @@ const UI = (() => {
     `;
   }
 
-  /** Opens the floating popover near the clicked ⓘ button. Position is
-   *  computed from the button's bounding rect, clamped so the popover
-   *  never overflows the viewport (bullet F: "internal panel/modal", not
-   *  a new window, and it should stay fully visible regardless of where
-   *  in the turn list the user clicked). */
+  /** Builds the floating stat block body for a LIVE encounter combatant
+   *  (used by the turn-row ⓘ button): shows current/max HP from the
+   *  instance, not just the template's starting value. */
+  function buildStatblockBody(inst) {
+    if (inst.sourceType === 'player') {
+      const tpl = PlayerLibrary.getById(inst.templateId);
+      if (!tpl) return '<p class="empty-hint">Šablona nenalezena.</p>';
+      return buildStatblockBodyForPlayerTemplate(tpl, `${inst.currentHp}/${inst.maxHp}`);
+    }
+    const tpl = MonsterLibrary.getById(inst.templateId);
+    if (!tpl) return '<p class="empty-hint">Šablona nenalezena.</p>';
+    return buildStatblockBodyForMonsterTemplate(tpl, `${inst.currentHp}/${inst.maxHp}`);
+  }
+
+  /** Builds the floating stat block body straight from a LIBRARY template,
+   *  with no live CombatantInstance involved yet (used by the ⓘ button in
+   *  the left-panel library lists, for previewing before adding to the
+   *  encounter). HP shows just the template's starting value, since there's
+   *  no "current" HP to speak of outside of an actual encounter. */
+  function buildStatblockBodyFromTemplate(sourceType, tpl) {
+    if (sourceType === 'player') {
+      return buildStatblockBodyForPlayerTemplate(tpl, `${tpl.currentHp}/${tpl.maxHp}`);
+    }
+    return buildStatblockBodyForMonsterTemplate(tpl, `${tpl.hitPoints}`);
+  }
+
+  /** Opens the floating popover near the clicked ⓘ button, for a LIVE
+   *  encounter combatant. Position is computed from the button's bounding
+   *  rect, clamped so the popover never overflows the viewport (bullet F:
+   *  "internal panel/modal", not a new window, and it should stay fully
+   *  visible regardless of where in the turn list the user clicked). */
   function openStatblockPopover(instanceId, anchorEl) {
     const inst = Encounter.getInstance(instanceId);
     if (!inst) return;
 
     statblockOpenForId = instanceId;
+    statblockOpenForTemplate = null;
     el.statblockTitle.textContent = inst.publicName || inst.displayName;
     el.statblockBody.innerHTML = buildStatblockBody(inst);
+    positionStatblockPopover(anchorEl);
+  }
+
+  /** Opens the floating popover for a LIBRARY template -- no live
+   *  CombatantInstance involved, used by the left-panel ⓘ buttons so the
+   *  DM can preview a monster/player before adding it to the encounter.
+   *  Sets statblockOpenForTemplate (not statblockOpenForId) so the
+   *  click-outside/Escape/pin handling and the live-update-on-change
+   *  logic in persistAndRerenderEncounter() can tell the two cases apart
+   *  -- a library preview has nothing in the encounter to stay in sync
+   *  with, so it's simpler and shouldn't try to "live update" itself. */
+  function openLibraryStatblockPopover(sourceType, templateId, anchorEl) {
+    const tpl = sourceType === 'player' ? PlayerLibrary.getById(templateId) : MonsterLibrary.getById(templateId);
+    if (!tpl) return;
+
+    statblockOpenForId = null;
+    statblockOpenForTemplate = { sourceType, templateId };
+    el.statblockTitle.textContent = tpl.name;
+    el.statblockBody.innerHTML = buildStatblockBodyFromTemplate(sourceType, tpl);
+    positionStatblockPopover(anchorEl);
+  }
+
+  /** Shared viewport-aware positioning logic for both popover entry points. */
+  function positionStatblockPopover(anchorEl) {
     el.statblockPopover.style.display = 'block';
 
     // Measure after making visible (so offsetWidth/Height are real), then
@@ -993,6 +1100,7 @@ const UI = (() => {
     if (statblockPinned) return; // pinned popovers only close via explicit Close/Escape
     el.statblockPopover.style.display = 'none';
     statblockOpenForId = null;
+    statblockOpenForTemplate = null;
   }
 
   function forceCloseStatblockPopover() {
@@ -1000,6 +1108,7 @@ const UI = (() => {
     el.statblockPinBtn.classList.remove('btn-primary');
     el.statblockPopover.style.display = 'none';
     statblockOpenForId = null;
+    statblockOpenForTemplate = null;
   }
 
   // -------------------------------------------------------------------
@@ -1037,6 +1146,26 @@ const UI = (() => {
     if (selectedInstanceId === instanceId) selectedInstanceId = null;
     selectedForGrouping.delete(instanceId);
     if (statblockOpenForId === instanceId) forceCloseStatblockPopover();
+
+    // If this instance was a player mid-"awaiting initiative", drop that
+    // tracking too -- otherwise its library row would keep showing the
+    // confirm input, pointed at an instance that no longer exists.
+    for (const [templateId, awaitingId] of awaitingInitiativeFor) {
+      if (awaitingId === instanceId) {
+        awaitingInitiativeFor.delete(templateId);
+        break;
+      }
+    }
+
+    // Removing a player combatant changes hasPlayerInstance()'s answer for
+    // its templateId, which the library row's Add/Added button state
+    // depends on -- re-render the player tab so it flips back to an
+    // active "Add" button immediately, not just after some other action
+    // happens to trigger a re-render (or a full page reload).
+    if (inst.sourceType === 'player') {
+      renderPlayerResults();
+    }
+
     persistAndRerenderEncounter();
   }
 
@@ -1083,8 +1212,10 @@ const UI = (() => {
         Encounter.reset();
         selectedInstanceId = null;
         selectedForGrouping.clear();
+        awaitingInitiativeFor.clear();
         forceCloseStatblockPopover();
         persistAndRerenderEncounter();
+        renderPlayerResults();
       }
     });
 
@@ -1122,8 +1253,10 @@ const UI = (() => {
           }
           Encounter.setState(json);
           selectedInstanceId = null;
+          awaitingInitiativeFor.clear();
           forceCloseStatblockPopover();
           persistAndRerenderEncounter();
+          renderPlayerResults();
           showImportStatus('Encounter byl načten.', 'ok');
         })
         .catch((err) => showImportStatus(String(err), 'error'))
@@ -1153,9 +1286,11 @@ const UI = (() => {
 
     // Click-outside-to-close: ignore clicks that originated on a ⓘ button
     // (those are handled by their own listener, which opens/repositions
-    // the popover for a *different* combatant) or inside the popover itself.
+    // the popover for a *different* combatant/template) or inside the
+    // popover itself. Works the same whether the open popover is a live
+    // encounter combatant or a library-template preview.
     document.addEventListener('click', (e) => {
-      if (!statblockOpenForId) return;
+      if (!statblockOpenForId && !statblockOpenForTemplate) return;
       if (el.statblockPopover.contains(e.target)) return;
       if (e.target.closest && e.target.closest('.statblock-info-btn')) return;
       closeStatblockPopover();
@@ -1176,7 +1311,7 @@ const UI = (() => {
       // Escape: close an open floating stat block first (even if pinned --
       // Escape is an explicit close per bullet F), otherwise fall through
       // to clearing selection as before.
-      if (e.key === 'Escape' && statblockOpenForId) {
+      if (e.key === 'Escape' && (statblockOpenForId || statblockOpenForTemplate)) {
         forceCloseStatblockPopover();
         return;
       }

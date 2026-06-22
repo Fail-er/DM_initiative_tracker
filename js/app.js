@@ -8,7 +8,7 @@
  */
 
 (function bootstrap() {
-  function start(sampleMonsterJson, samplePlayerJson) {
+  function start(sampleMonsterJson, samplePlayerJson, sampleSpellJson) {
     // Prefer a previously saved/imported library over the bundled sample,
     // so a DM's custom monster set survives page reloads. Fall back to
     // sample data on first run.
@@ -28,12 +28,21 @@
       Storage.savePlayers(PlayerLibrary.getAll());
     }
 
+    const savedSpells = Storage.loadSpells();
+    if (savedSpells && Array.isArray(savedSpells.spells) && savedSpells.spells.length) {
+      SpellLibrary.loadFromJson(savedSpells, true);
+    } else {
+      SpellLibrary.loadFromJson(sampleSpellJson, true);
+      Storage.saveSpells(SpellLibrary.getAll());
+    }
+
     const savedEncounter = Storage.loadEncounter();
     if (savedEncounter) {
       Encounter.setState(savedEncounter);
     }
 
     UI.init();
+    SpellUI.init();
   }
 
   // Try to fetch the bundled sample files. This works when the page is
@@ -50,9 +59,13 @@
       if (!res.ok) throw new Error('HTTP ' + res.status);
       return res.json();
     }),
+    fetch('data/sample-spells.json').then((res) => {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }),
   ])
-    .then(([monsters, players]) => start(monsters, players))
-    .catch(() => start(INLINE_SAMPLE_MONSTERS, INLINE_SAMPLE_PLAYERS));
+    .then(([monsters, players, spells]) => start(monsters, players, spells))
+    .catch(() => start(INLINE_SAMPLE_MONSTERS, INLINE_SAMPLE_PLAYERS, INLINE_SAMPLE_SPELLS));
 })();
 
 /**
@@ -172,6 +185,49 @@ const INLINE_SAMPLE_PLAYERS = {
         { name: 'Sneak Attack', text: 'Once per turn, +3d6 damage on an attack with advantage or with an ally adjacent to the target.' },
         { name: 'Cunning Action', text: 'Bonus action to Dash, Disengage, or Hide.' },
       ],
+    },
+  ],
+};
+
+/**
+ * Short inline fallback spell set (used only if fetch() is blocked).
+ * Trimmed to a few spells covering distinct field shapes -- the full set
+ * lives in data/sample-spells.json and is what's normally loaded.
+ */
+const INLINE_SAMPLE_SPELLS = {
+  spells: [
+    {
+      id: 'fireball-phb', name: 'Fireball', source: 'PHB', level: 3, school: 'Evocation',
+      castingTime: '1 action', range: '150 ft.', components: 'V, S, M (a tiny ball of bat guano and sulfur)',
+      duration: 'Instantaneous', concentration: false, ritual: false,
+      classes: ['Sorcerer', 'Wizard'], save: 'DEX', attackType: null,
+      damageTypes: ['fire'], conditions: [], area: null,
+      entries: [
+        'A bright streak flashes from your pointing finger to a point you choose within range and then blossoms with a low roar into an explosion of flame. Each creature in a 20-foot-radius sphere centered on that point must make a Dexterity saving throw. A target takes 8d6 fire damage on a failed save, or half as much damage on a successful one.',
+      ],
+      higherLevel: 'When you cast this spell using a spell slot of 4th level or higher, the damage increases by 1d6 for each slot level above 3rd.',
+    },
+    {
+      id: 'bless-phb', name: 'Bless', source: 'PHB', level: 1, school: 'Enchantment',
+      castingTime: '1 action', range: '30 ft.', components: 'V, S, M (a sprinkling of holy water)',
+      duration: 'Concentration, up to 1 minute', concentration: true, ritual: false,
+      classes: ['Cleric', 'Paladin'], save: null, attackType: null,
+      damageTypes: [], conditions: [], area: null,
+      entries: [
+        'You bless up to three creatures of your choice within range. Whenever a target makes an attack roll or a saving throw before the spell ends, the target can roll a d4 and add the number rolled to the attack roll or saving throw.',
+      ],
+      higherLevel: 'When you cast this spell using a spell slot of 2nd level or higher, you can target one additional creature for each slot level above 1st.',
+    },
+    {
+      id: 'counterspell-phb', name: 'Counterspell', source: 'PHB', level: 3, school: 'Abjuration',
+      castingTime: '1 reaction (which you take when you see a creature within 60 feet of you casting a spell)',
+      range: '60 ft.', components: 'S', duration: 'Instantaneous', concentration: false, ritual: false,
+      classes: ['Sorcerer', 'Warlock', 'Wizard'], save: null, attackType: null,
+      damageTypes: [], conditions: [], area: null,
+      entries: [
+        "You attempt to interrupt a creature in the process of casting a spell. If the creature is casting a spell of 3rd level or lower, its spell fails and has no effect. If it is casting a spell of 4th level or higher, make an ability check using your spellcasting ability. The DC equals 10 + the spell's level. On a success, the creature's spell fails and has no effect.",
+      ],
+      higherLevel: null,
     },
   ],
 };

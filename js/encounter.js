@@ -128,6 +128,15 @@ const Encounter = (() => {
     if (inst.sourceType === 'player' && inst.streamLabel === undefined) {
       inst.streamLabel = inst.displayName;
     }
+    // Backward compatibility: a monster saved before isAnonymized existed
+    // defaults to true, preserving the old behavior where every monster
+    // was always shown as "Nepřítel N" in the player view. Newly-added
+    // monsters get isAnonymized: false directly in addFromTemplate
+    // (real name visible by default) -- this fallback only matters for
+    // instances loaded from old saved/imported encounter data.
+    if (inst.sourceType === 'monster' && inst.isAnonymized === undefined) {
+      inst.isAnonymized = true;
+    }
     return inst;
   }
 
@@ -180,11 +189,19 @@ const Encounter = (() => {
         templateId: template.id,
         displayName: name,
         publicName: name,
-        // Spoiler-free label for the player-view broadcast (bullet:
-        // monsters show as "Nepřítel N", never their real name/type).
-        // Assigned once here and never recalculated.
+        // Spoiler-free fallback label for the player-view broadcast,
+        // used only when isAnonymized is true (see below). Assigned once
+        // here and never recalculated, so the number stays stable
+        // whenever the DM later toggles anonymization on.
         streamEnemyNumber: enemyNumber,
         streamLabel: `Nepřítel ${enemyNumber}`,
+        // New default: monsters show their REAL name in the player view
+        // unless the DM explicitly anonymizes them (common monsters like
+        // wolves/goblins rarely need hiding; bosses/uniques do). This
+        // only affects newly-added monsters -- see setState()'s
+        // backward-compat pass for how existing saved encounters are
+        // handled (they keep the old always-anonymous behavior).
+        isAnonymized: false,
         currentHp: template.hitPoints,
         maxHp: template.hitPoints,
         tempHp: 0,
@@ -471,6 +488,16 @@ const Encounter = (() => {
     inst.isDead = true;
   }
 
+  /** Toggles whether a monster shows its real name or the generic
+   *  "Nepřítel N" label in the player-view broadcast. No-op for players
+   *  (sourceType !== 'monster') -- they're never anonymized regardless
+   *  of any attempt to toggle this on them. */
+  function toggleMonsterAnonymization(instanceId) {
+    const inst = getInstance(instanceId);
+    if (!inst || inst.sourceType !== 'monster') return;
+    inst.isAnonymized = !inst.isAnonymized;
+  }
+
   // ---- Conditions ----------------------------------------------------------------
 
   function addCondition(instanceId, condition) {
@@ -497,6 +524,15 @@ const Encounter = (() => {
    *  Tracked directly by instanceId (not a position index), so reordering
    *  the list -- by adding a combatant, re-rolling, or editing initiative
    *  mid-fight -- never silently changes whose turn it is. */
+  /** True for combatants that Next Turn / Previous Turn should skip over
+   *  entirely -- currently just dead monsters. Players are NEVER
+   *  skipped, even at 0 HP/dead, since a player may still need their
+   *  turn (e.g. to roll a death save) -- only monsters, which have no
+   *  equivalent mechanic, are skipped once dead. */
+  function isSkippableForTurnOrder(inst) {
+    return inst.sourceType === 'monster' && inst.isDead === true;
+  }
+
   function getActiveInstanceId() {
     const ordered = sortedInstances();
     if (!ordered.length) return null;
@@ -507,35 +543,59 @@ const Encounter = (() => {
     return ordered[0].instanceId;
   }
 
-  /** Advances to the next combatant in turn order. Wrapping past the last
-   *  combatant rolls over to the first WITHOUT incrementing the round --
-   *  use nextRound() for that. */
-  /** Advances to the next combatant in turn order. Wrapping past the last
-   *  combatant rolls over to the first AND increments the round counter --
-   *  reaching the end of the initiative order is exactly when a new round
-   *  begins, regardless of whether the DM got there one step at a time or
-   *  used nextRound() to jump there directly. */
+  /** Advances to the next combatant in turn order, skipping over any
+   *  dead monsters along the way (players are never skipped -- see
+   *  isSkippableForTurnOrder). Wrapping past the last combatant rolls
+   *  over to the first AND increments the round counter -- reaching the
+   *  end of the initiative order is exactly when a new round begins,
+   *  regardless of whether the DM got there one step at a time or used
+   *  nextRound() to jump there directly.
+   *
+   *  If every remaining candidate is skippable (e.g. the entire rest of
+   *  the encounter is dead monsters), the loop gives up after one full
+   *  pass and lands on the next slot anyway, rather than spinning
+   *  forever -- an all-dead-monsters encounter is a degenerate case the
+   *  DM should resolve some other way (Remove them, add a new combatant,
+   *  etc.), not something this function needs to handle gracefully. */
   function nextTurn() {
     const ordered = sortedInstances();
     if (!ordered.length) return;
     const currentId = getActiveInstanceId();
-    const idx = ordered.findIndex((i) => i.instanceId === currentId);
-    const nextIdx = (idx + 1) % ordered.length;
-    state.activeInstanceId = ordered[nextIdx].instanceId;
-    if (nextIdx === 0) state.round++;
+    const startIdx = ordered.findIndex((i) => i.instanceId === currentId);
+
+    let idx = startIdx;
+    let wrapped = false;
+    for (let steps = 0; steps < ordered.length; steps++) {
+      idx = (idx + 1) % ordered.length;
+      if (idx === 0) wrapped = true;
+      if (!isSkippableForTurnOrder(ordered[idx])) break;
+    }
+
+    state.activeInstanceId = ordered[idx].instanceId;
+    if (wrapped) state.round++;
   }
 
-  /** Steps back to the previous combatant in turn order. Mirrors nextTurn():
-   *  wrapping backward from the first combatant to the last decrements the
-   *  round counter, clamped at a minimum of 1 (rounds don't go negative). */
+  /** Steps back to the previous combatant in turn order, skipping over
+   *  dead monsters the same way nextTurn() does. Mirrors nextTurn() for
+   *  round-counter purposes too: wrapping backward from the first
+   *  combatant to the last decrements the round counter, clamped at a
+   *  minimum of 1. */
   function previousTurn() {
     const ordered = sortedInstances();
     if (!ordered.length) return;
     const currentId = getActiveInstanceId();
-    const idx = ordered.findIndex((i) => i.instanceId === currentId);
-    const prevIdx = (idx - 1 + ordered.length) % ordered.length;
-    state.activeInstanceId = ordered[prevIdx].instanceId;
-    if (prevIdx === ordered.length - 1) state.round = Math.max(1, state.round - 1);
+    const startIdx = ordered.findIndex((i) => i.instanceId === currentId);
+
+    let idx = startIdx;
+    let wrapped = false;
+    for (let steps = 0; steps < ordered.length; steps++) {
+      idx = (idx - 1 + ordered.length) % ordered.length;
+      if (idx === ordered.length - 1) wrapped = true;
+      if (!isSkippableForTurnOrder(ordered[idx])) break;
+    }
+
+    state.activeInstanceId = ordered[idx].instanceId;
+    if (wrapped) state.round = Math.max(1, state.round - 1);
   }
 
   /** Jumps straight to the top of the turn order and increments the round
@@ -570,6 +630,7 @@ const Encounter = (() => {
     setHp,
     setMax,
     markDead,
+    toggleMonsterAnonymization,
     addCondition,
     removeCondition,
     setNotes,

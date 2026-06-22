@@ -11,6 +11,7 @@ const Storage = (() => {
   const LIBRARY_KEY = 'dnd-tracker:library';
   const PLAYERS_KEY = 'dnd-tracker:players';
   const SPELLS_KEY = 'dnd-tracker:spells';
+  const COMBAT_LOG_KEY = 'dnd-tracker:combat-log';
 
   function saveEncounter(state) {
     try {
@@ -84,6 +85,111 @@ const Storage = (() => {
     }
   }
 
+  function saveCombatLog(entries) {
+    try {
+      localStorage.setItem(COMBAT_LOG_KEY, JSON.stringify(entries));
+    } catch (e) {
+      console.error('Nepodařilo se uložit combat log do localStorage:', e);
+    }
+  }
+
+  function loadCombatLog() {
+    try {
+      const raw = localStorage.getItem(COMBAT_LOG_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      console.error('Nepodařilo se načíst combat log z localStorage:', e);
+      return null;
+    }
+  }
+
+  // All localStorage keys the app uses, in one place -- both
+  // exportAllBackup and importAllBackup iterate this list, so adding a
+  // new persisted feature later just means adding its key here rather
+  // than touching the backup logic itself.
+  const ALL_STORAGE_KEYS = {
+    encounter: ENCOUNTER_KEY,
+    library: LIBRARY_KEY,
+    players: PLAYERS_KEY,
+    spells: SPELLS_KEY,
+    combatLog: COMBAT_LOG_KEY,
+  };
+
+  /**
+   * Bundles every localStorage key the app uses into one backup object,
+   * downloadable as a single .json file. Reads each key's RAW string
+   * value directly (not through e.g. loadEncounter()'s JSON.parse +
+   * null-on-error handling) so a single corrupted/missing key doesn't
+   * prevent the rest of the backup from being collected -- each entry
+   * is independently null if absent or unreadable, rather than the
+   * whole export failing.
+   */
+  function exportAllBackup() {
+    const data = {};
+    Object.entries(ALL_STORAGE_KEYS).forEach(([name, key]) => {
+      try {
+        data[name] = localStorage.getItem(key); // raw string, or null if absent
+      } catch (e) {
+        data[name] = null;
+      }
+    });
+    return {
+      format: 'dnd-tracker-backup',
+      version: 1,
+      createdAt: new Date().toISOString(),
+      data,
+    };
+  }
+
+  /**
+   * Restores localStorage from a backup object previously produced by
+   * exportAllBackup(). Writes each key's raw value back directly. A key
+   * that's missing or null in the backup is left untouched in
+   * localStorage (not cleared) -- this means restoring an older backup
+   * that predates some newer feature (e.g. spells) won't wipe out data
+   * for that feature if it already exists locally; it simply doesn't
+   * touch it either way.
+   * @returns {{restored: string[], skipped: string[]}} which named
+   *          sections were actually written vs. left alone (absent from
+   *          the backup file), for the caller to report back to the DM.
+   */
+  function importAllBackup(backup) {
+    const restored = [];
+    const skipped = [];
+    const source = backup && backup.data ? backup.data : {};
+
+    Object.entries(ALL_STORAGE_KEYS).forEach(([name, key]) => {
+      const value = source[name];
+      if (typeof value === 'string') {
+        try {
+          localStorage.setItem(key, value);
+          restored.push(name);
+        } catch (e) {
+          skipped.push(name);
+        }
+      } else {
+        skipped.push(name);
+      }
+    });
+
+    return { restored, skipped };
+  }
+
+  /** Triggers a browser download of a plain-text string -- used by the
+   *  Combat Log's Export TXT button. Separate from downloadJson since
+   *  this isn't JSON and shouldn't be pretty-printed/stringified. */
+  function downloadText(text, filename) {
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   /** Triggers a browser download of the given object as a pretty-printed JSON file. */
   function downloadJson(obj, filename) {
     const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
@@ -130,7 +236,12 @@ const Storage = (() => {
     loadPlayers,
     saveSpells,
     loadSpells,
+    saveCombatLog,
+    loadCombatLog,
+    exportAllBackup,
+    importAllBackup,
     downloadJson,
+    downloadText,
     readJsonFile,
   };
 })();

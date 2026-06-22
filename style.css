@@ -342,6 +342,89 @@ body {
 }
 
 /* =========================================================================
+   Combat Log floating panel
+   ========================================================================= */
+
+.combat-log-panel {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  width: 480px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--gold-dim);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+.combat-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-soft);
+  position: sticky;
+  top: 0;
+  cursor: move;
+  user-select: none;
+}
+
+.combat-log-title {
+  font-family: var(--font-display);
+  color: var(--gold);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.combat-log-header-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  cursor: default;
+}
+
+.combat-log-header-actions .btn {
+  padding: 3px 8px;
+  font-size: 0.75rem;
+}
+
+.combat-log-body {
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.combat-log-entry {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border-soft);
+  line-height: 1.4;
+}
+
+.combat-log-entry:last-child {
+  border-bottom: none;
+}
+
+.combat-log-round {
+  font-family: var(--font-mono);
+  color: var(--gold-dim);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.combat-log-message {
+  color: var(--text-parchment);
+}
+
+/* =========================================================================
    Layout
    ========================================================================= */
 
@@ -1100,6 +1183,31 @@ body {
   flex-shrink: 0;
 }
 
+.anonymize-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0.55;
+}
+
+.anonymize-toggle-btn:hover {
+  opacity: 1;
+}
+
+/* Active = this monster IS currently anonymized in the player view --
+   colored so the DM can spot hidden monsters at a glance in the turn
+   list, same visual language as other "this is toggled on" indicators
+   elsewhere in the app (e.g. group-selection's steel-blue accent). */
+.anonymize-toggle-btn-active {
+  opacity: 1;
+  color: var(--steel-blue);
+}
+
 .remove-instance-btn:hover {
   color: var(--red-blood);
 }
@@ -1755,5 +1863,10 @@ body {
   .spell-card {
     width: calc(100vw - 32px);
     max-width: 360px;
+  }
+
+  .combat-log-panel {
+    width: calc(100vw - 32px);
+    max-width: 480px;
   }
 }

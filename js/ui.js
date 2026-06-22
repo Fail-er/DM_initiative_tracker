@@ -39,6 +39,17 @@ const UI = (() => {
   // click handler in wireTopLevelControls for the full reasoning.
   let playerViewWindowRef = null;
 
+  // Undo history: up to UNDO_STACK_LIMIT deep-cloned snapshots of the
+  // whole encounter state, pushed right before each mutation by the
+  // mutate() wrapper. Undo pops the most recent one and restores it
+  // wholesale -- simpler and far less error-prone than writing a manual
+  // inverse for every individual action type (HP, conditions, grouping,
+  // add/remove, sync...), at the cost of a small amount of memory for a
+  // few JSON-cloned encounter snapshots, which is negligible for the
+  // size of state this app deals with.
+  let undoStack = [];
+  const UNDO_STACK_LIMIT = 5;
+
   // Which accordion sections are open in the detail panel, keyed by
   // section key (see ACCORDION_DEFAULTS). Persists across re-renders
   // within the session but resets per newly-selected combatant so each
@@ -62,6 +73,7 @@ const UI = (() => {
   // pinned. Pinning a SECOND monster no longer destroys the first.
   let pinnedStatblockPanels = [];
   let statblockPanel = null; // DraggablePanel instance, created in cacheRefs
+  let combatLogPanel = null; // DraggablePanel instance for the Combat Log, created in cacheRefs
 
   // ---- DOM refs (filled in init) ----
   let el = {};
@@ -105,6 +117,18 @@ const UI = (() => {
       statblockBody: document.getElementById('statblock-popover-body'),
       statblockCloseBtn: document.getElementById('statblock-close-btn'),
       statblockPinBtn: document.getElementById('statblock-pin-btn'),
+
+      undoBtn: document.getElementById('undo-btn'),
+      combatLogBtn: document.getElementById('combat-log-btn'),
+      backupBtn: document.getElementById('backup-btn'),
+      restoreBtn: document.getElementById('restore-btn'),
+      restoreInput: document.getElementById('restore-input'),
+      combatLogPanel: document.getElementById('combat-log-panel'),
+      combatLogHeader: document.getElementById('combat-log-header'),
+      combatLogBody: document.getElementById('combat-log-body'),
+      combatLogExportBtn: document.getElementById('combat-log-export-btn'),
+      combatLogPinBtn: document.getElementById('combat-log-pin-btn'),
+      combatLogCloseBtn: document.getElementById('combat-log-close-btn'),
     };
 
     statblockPanel = DraggablePanel.create({
@@ -125,6 +149,53 @@ const UI = (() => {
         statblockPanel.close();
       },
     });
+
+    // Combat Log panel: a single persistent panel (not a "live preview
+    // slot" like the statblock/spell card -- there's only ever one log),
+    // so it just uses DraggablePanel.create() directly with normal
+    // pin/drag/close behavior. No onPinRequested override needed.
+    combatLogPanel = DraggablePanel.create({
+      panelEl: el.combatLogPanel,
+      headerEl: el.combatLogHeader,
+      pinBtn: el.combatLogPinBtn,
+      closeBtn: el.combatLogCloseBtn,
+      onClose: () => {},
+    });
+  }
+
+  /** Renders the Combat Log panel's entry list. Newest entry last (normal
+   *  chronological reading order, like scrolling down a chat log) --
+   *  the panel's body scrolls to the bottom after rendering so the DM
+   *  always sees the most recent entries without having to scroll
+   *  manually after every action. */
+  function renderCombatLogBody() {
+    const entries = CombatLog.getAll();
+    if (!entries.length) {
+      el.combatLogBody.innerHTML = '<p class="empty-hint">Log je prázdný. Zápisy se objeví, jak budeš hrát.</p>';
+      return;
+    }
+    el.combatLogBody.innerHTML = entries.map((e) => `
+      <div class="combat-log-entry">
+        <span class="combat-log-round">Round ${e.round}:</span>
+        <span class="combat-log-message">${escapeHtml(e.message)}</span>
+      </div>
+    `).join('');
+    el.combatLogBody.scrollTop = el.combatLogBody.scrollHeight;
+  }
+
+  /** Opens the Combat Log panel, centered in the viewport (it has no
+   *  anchor element to position relative to -- it's opened from a
+   *  header button, not a specific row/icon, same situation as the
+   *  spell card). Re-renders fresh content on every open so a panel
+   *  left open from earlier doesn't show stale entries. */
+  function openCombatLogPanel() {
+    renderCombatLogBody();
+    const wasHidden = el.combatLogPanel.style.display === 'none' || !el.combatLogPanel.style.display;
+    if (wasHidden) el.combatLogPanel.style.display = 'block';
+    const panelWidth = el.combatLogPanel.offsetWidth;
+    const left = (window.innerWidth - panelWidth) / 2;
+    const top = 80;
+    combatLogPanel.showAt(left, top);
   }
 
   // -------------------------------------------------------------------
@@ -287,11 +358,13 @@ const UI = (() => {
 
       addBtn.addEventListener('click', () => {
         const count = parseInt(qtyInput.value, 10) || 1;
-        const added = Encounter.addFromTemplate(tpl, count);
-        if (added.length) {
-          selectedInstanceId = added[added.length - 1].instanceId;
-        }
-        persistAndRerenderEncounter();
+        mutate(
+          count === 1 ? `${tpl.name} added to encounter` : `${count}x ${tpl.name} added to encounter`,
+          () => {
+            const added = Encounter.addFromTemplate(tpl, count);
+            if (added.length) selectedInstanceId = added[added.length - 1].instanceId;
+          }
+        );
       });
 
       el.monsterResults.appendChild(row);
@@ -391,10 +464,11 @@ const UI = (() => {
           const raw = initInput.value.trim();
           const value = raw === '' ? null : parseInt(raw, 10);
           if (Number.isFinite(value)) {
-            Encounter.setInitiative(awaitingInstanceId, value);
+            mutate(`${p.name} initiative set to ${value}`, () => {
+              Encounter.setInitiative(awaitingInstanceId, value);
+            });
           }
           awaitingInitiativeFor.delete(p.id);
-          persistAndRerenderEncounter();
           renderPlayerResults();
         };
 
@@ -411,10 +485,11 @@ const UI = (() => {
         // initiative null and flips this row into "awaiting initiative".
         const addBtn = row.querySelector('.btn-add');
         addBtn.addEventListener('click', () => {
-          const inst = Encounter.addPlayerFromTemplate(p, null);
-          awaitingInitiativeFor.set(p.id, inst.instanceId);
-          selectedInstanceId = inst.instanceId;
-          persistAndRerenderEncounter();
+          mutate(`${p.name} added to encounter`, () => {
+            const inst = Encounter.addPlayerFromTemplate(p, null);
+            awaitingInitiativeFor.set(p.id, inst.instanceId);
+            selectedInstanceId = inst.instanceId;
+          });
           renderPlayerResults();
         });
       }
@@ -432,16 +507,13 @@ const UI = (() => {
    *  asking each player in sequence and using the single-Add flow below. */
   function handleAddAllPlayers() {
     const players = PlayerLibrary.getAll();
-    let addedCount = 0;
-    players.forEach((p) => {
-      if (Encounter.hasPlayerInstance(p.id)) return;
-      Encounter.addPlayerFromTemplate(p, null);
-      addedCount++;
+    const toAdd = players.filter((p) => !Encounter.hasPlayerInstance(p.id));
+    if (!toAdd.length) return;
+
+    mutate(`Add All Players (${toAdd.map((p) => p.name).join(', ')})`, () => {
+      toAdd.forEach((p) => Encounter.addPlayerFromTemplate(p, null));
     });
-    if (addedCount > 0) {
-      persistAndRerenderEncounter();
-      renderPlayerResults();
-    }
+    renderPlayerResults();
   }
 
   /** Re-reads the player library from localStorage and re-renders the
@@ -515,6 +587,10 @@ const UI = (() => {
       const badgeClass = isPlayer ? 'source-badge source-badge-pc' : 'source-badge source-badge-mon';
       const badgeText = isPlayer ? 'PC' : 'MON';
 
+      const anonymizeBtnHtml = !isPlayer
+        ? `<button class="anonymize-toggle-btn${inst.isAnonymized ? ' anonymize-toggle-btn-active' : ''}" type="button" data-instance-id="${inst.instanceId}" title="${inst.isAnonymized ? 'Zobrazit skutečné jméno v Player View' : 'Skrýt jméno v Player View (zobrazí se jako Nepřítel N)'}" aria-label="Přepnout anonymizaci v Player View">🎭</button>`
+        : '';
+
       row.innerHTML = `
         <input type="checkbox" class="group-checkbox" ${isGroupSelected ? 'checked' : ''} aria-label="Vybrat do skupiny" />
         <div class="turn-row-init">${initDisplay}</div>
@@ -524,6 +600,7 @@ const UI = (() => {
             <span class="${badgeClass}">${badgeText}</span>
             <span class="turn-row-name-text">${escapeHtml(inst.publicName || inst.displayName)}</span>
             ${inst.isDead ? '<span class="dead-tag">DEAD</span>' : ''}
+            ${anonymizeBtnHtml}
             <button class="statblock-info-btn" type="button" data-instance-id="${inst.instanceId}" title="Stat block" aria-label="Zobrazit stat block">ⓘ</button>
             <button class="remove-instance-btn" type="button" data-instance-id="${inst.instanceId}" title="Odstranit z encounteru (Delete)" aria-label="Odstranit z encounteru">🗑</button>
           </div>
@@ -546,6 +623,19 @@ const UI = (() => {
         toggleGroupSelection(inst.instanceId);
         renderEncounter();
       });
+
+      // The 🎭 button: toggles whether this monster shows its real name
+      // or the generic "Nepřítel N" label in the Player View broadcast.
+      // Monster-only (the button isn't rendered for players at all).
+      // Takes effect on the next broadcast -- no separate "apply" step,
+      // since broadcastPlayerView() reads isAnonymized fresh every time.
+      const anonymizeBtn = row.querySelector('.anonymize-toggle-btn');
+      if (anonymizeBtn) {
+        anonymizeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          mutate(null, () => Encounter.toggleMonsterAnonymization(inst.instanceId));
+        });
+      }
 
       // The ⓘ button (bullet F): opens the floating stat block popover
       // WITHOUT selecting the row or disturbing focus/grouping state.
@@ -852,8 +942,9 @@ const UI = (() => {
         alert(`Šablona hráče "${inst.templateId}" nebyla v knihovně nalezena. Zkus nejdřív Reload Players.`);
         return;
       }
-      Encounter.syncPlayerFromTemplate(inst.instanceId, freshTpl);
-      persistAndRerenderEncounter();
+      mutate(`${inst.publicName || inst.displayName} synced from library`, () => {
+        Encounter.syncPlayerFromTemplate(inst.instanceId, freshTpl);
+      });
     });
   }
 
@@ -893,18 +984,44 @@ const UI = (() => {
     `).join('');
   }
 
+  /** Builds a log-message function for an HP-changing action that
+   *  detects whether the action ALSO killed the combatant (HP hit 0),
+   *  appending "and died" when that's a NEW transition -- not when the
+   *  combatant was already dead before this action ran (e.g. further
+   *  damage to a corpse shouldn't re-announce a death that already
+   *  happened). Returns a function suitable for passing directly as
+   *  mutate()'s logMessage argument. */
+  function hpChangeMessage(instanceId, baseMessage) {
+    const before = Encounter.getInstance(instanceId);
+    const wasAlreadyDead = !!(before && before.isDead);
+    return () => {
+      const current = Encounter.getInstance(instanceId);
+      const justDied = current && current.isDead && !wasAlreadyDead;
+      return justDied ? `${baseMessage} and died` : baseMessage;
+    };
+  }
+
   function wireDetailEvents(inst) {
+    const name = inst.publicName || inst.displayName;
+
     const acInput = document.getElementById('detail-ac');
     acInput.addEventListener('change', () => {
-      inst.armorClass = parseInt(acInput.value, 10) || 0;
-      persistAndRerenderEncounter();
+      const newAc = parseInt(acInput.value, 10) || 0;
+      const oldAc = inst.armorClass;
+      if (newAc === oldAc) return;
+      mutate(`${name} AC changed from ${oldAc} to ${newAc}`, () => {
+        inst.armorClass = newAc;
+      });
     });
 
     const initInput = document.getElementById('detail-init');
     initInput.addEventListener('change', () => {
       const raw = initInput.value.trim();
-      Encounter.setInitiative(inst.instanceId, raw === '' ? null : parseInt(raw, 10));
-      persistAndRerenderEncounter();
+      const value = raw === '' ? null : parseInt(raw, 10);
+      mutate(
+        value === null ? `${name} initiative cleared` : `${name} initiative set to ${value}`,
+        () => Encounter.setInitiative(inst.instanceId, value)
+      );
     });
 
     // Re-roll button only exists for initiativeMode === "auto" (monsters);
@@ -913,27 +1030,26 @@ const UI = (() => {
     const rerollBtn = document.getElementById('reroll-init-btn');
     if (rerollBtn) {
       rerollBtn.addEventListener('click', () => {
-        Encounter.rollInitiativeFor(inst.instanceId);
-        persistAndRerenderEncounter();
+        mutate(`${name} initiative re-rolled`, () => Encounter.rollInitiativeFor(inst.instanceId));
       });
     }
 
     document.querySelectorAll('.hp-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const delta = parseInt(btn.dataset.delta, 10);
-        Encounter.applyDelta(inst.instanceId, delta);
-        persistAndRerenderEncounter();
+        const baseMsg = delta < 0
+          ? `${name} took ${-delta} damage`
+          : `${name} healed ${delta}`;
+        mutate(hpChangeMessage(inst.instanceId, baseMsg), () => Encounter.applyDelta(inst.instanceId, delta));
       });
     });
 
     document.getElementById('hp-max-btn').addEventListener('click', () => {
-      Encounter.setMax(inst.instanceId);
-      persistAndRerenderEncounter();
+      mutate(`${name} HP set to max`, () => Encounter.setMax(inst.instanceId));
     });
 
     document.getElementById('hp-dead-btn').addEventListener('click', () => {
-      Encounter.markDead(inst.instanceId);
-      persistAndRerenderEncounter();
+      mutate(`${name} marked Dead`, () => Encounter.markDead(inst.instanceId));
     });
 
     document.getElementById('hp-remove-btn').addEventListener('click', () => {
@@ -947,9 +1063,8 @@ const UI = (() => {
       if (e.key !== 'Enter') return;
       const n = parseInt(minusInput.value, 10);
       if (Number.isFinite(n) && n > 0) {
-        Encounter.applyDelta(inst.instanceId, -n);
+        mutate(hpChangeMessage(inst.instanceId, `${name} took ${n} damage`), () => Encounter.applyDelta(inst.instanceId, -n));
         minusInput.value = '';
-        persistAndRerenderEncounter();
       }
     });
 
@@ -958,9 +1073,8 @@ const UI = (() => {
       if (e.key !== 'Enter') return;
       const n = parseInt(plusInput.value, 10);
       if (Number.isFinite(n) && n > 0) {
-        Encounter.applyDelta(inst.instanceId, n);
+        mutate(`${name} healed ${n}`, () => Encounter.applyDelta(inst.instanceId, n));
         plusInput.value = '';
-        persistAndRerenderEncounter();
       }
     });
 
@@ -969,24 +1083,23 @@ const UI = (() => {
       if (e.key !== 'Enter') return;
       const n = parseInt(setInput.value, 10);
       if (Number.isFinite(n)) {
-        Encounter.setHp(inst.instanceId, n);
+        mutate(hpChangeMessage(inst.instanceId, `${name} HP set to ${n}`), () => Encounter.setHp(inst.instanceId, n));
         setInput.value = '';
-        persistAndRerenderEncounter();
       }
     });
 
     const conditionSelect = document.getElementById('condition-select');
     conditionSelect.addEventListener('change', () => {
       if (conditionSelect.value) {
-        Encounter.addCondition(inst.instanceId, conditionSelect.value);
-        persistAndRerenderEncounter();
+        const condition = conditionSelect.value;
+        mutate(`${name} gained ${condition}`, () => Encounter.addCondition(inst.instanceId, condition));
       }
     });
 
     document.querySelectorAll('.condition-remove').forEach((btn) => {
       btn.addEventListener('click', () => {
-        Encounter.removeCondition(inst.instanceId, btn.dataset.condition);
-        persistAndRerenderEncounter();
+        const condition = btn.dataset.condition;
+        mutate(`${name} removed ${condition}`, () => Encounter.removeCondition(inst.instanceId, condition));
       });
     });
 
@@ -1147,6 +1260,83 @@ const UI = (() => {
   // Shared re-render + persistence helper
   // -------------------------------------------------------------------
 
+  /**
+   * Central wrapper for every encounter-mutating action. Three things
+   * happen, in order:
+   *   1. The current encounter state is deep-cloned, and the combat
+   *      log's current length is recorded, both pushed onto the undo
+   *      stack (capped at UNDO_STACK_LIMIT) BEFORE the mutation -- this
+   *      is what makes performUndo() able to restore "the state right
+   *      before this action" later, log included.
+   *   2. actionFn() runs the actual Encounter.* mutation(s).
+   *   3. If logMessage is non-null, it's recorded to CombatLog tagged
+   *      with the round the action happened in. Passing null skips
+   *      logging entirely -- used for noisy/uninteresting changes like
+   *      notes text, where a log entry per keystroke would be useless.
+   * Finally, persistAndRerenderEncounter() runs as it always did, so
+   * every call site that previously called an Encounter.* mutation
+   * directly and then persistAndRerenderEncounter() can simply wrap
+   * both into a single mutate() call instead.
+   */
+  function mutate(logMessage, actionFn) {
+    const encounterSnapshot = JSON.parse(JSON.stringify(Encounter.getState()));
+    const logCountBefore = CombatLog.count();
+    undoStack.push({ encounterSnapshot, logCountBefore });
+    if (undoStack.length > UNDO_STACK_LIMIT) undoStack.shift();
+    updateUndoButtonState();
+
+    // actionFn is expected to perform the Encounter.* mutation AND any
+    // related UI-local state updates (e.g. setting selectedInstanceId to
+    // a newly-added instance) before this function moves on to logging
+    // and re-rendering -- so callers can do everything they need inside
+    // the closure passed here, same as they did inline before this
+    // wrapper existed.
+    actionFn();
+
+    // logMessage may be a plain string (decided before the action ran,
+    // for actions whose outcome is already fully known up front) OR a
+    // function (called now, AFTER actionFn, so it can inspect the
+    // resulting state -- e.g. HP damage that also brought a combatant to
+    // 0 and killed it needs to describe BOTH things, which isn't known
+    // until after applyDelta() has actually run).
+    const resolvedMessage = typeof logMessage === 'function' ? logMessage() : logMessage;
+
+    if (resolvedMessage) {
+      const round = Encounter.getState().round;
+      CombatLog.add(round, resolvedMessage);
+      Storage.saveCombatLog(CombatLog.getAll());
+    }
+
+    persistAndRerenderEncounter();
+  }
+
+  /** Reflects whether there's anything to undo in the button's
+   *  enabled/disabled state, so the DM gets a clear visual signal rather
+   *  than clicking Undo and having nothing happen with no explanation. */
+  function updateUndoButtonState() {
+    el.undoBtn.disabled = undoStack.length === 0;
+  }
+
+  /** Pops the most recent undo entry (encounter snapshot + the combat
+   *  log's length right before that action) and restores both: the
+   *  encounter state wholesale via Encounter.setState(), and the combat
+   *  log trimmed back to exactly its pre-action length -- so whatever
+   *  log entries that action created are removed too, keeping the log
+   *  consistent with what's actually still true of the encounter.
+   *  Undoing is not itself an undoable/loggable action -- it just steps
+   *  back through existing history, and removing log entries here is
+   *  the log's own history correcting itself, not a new event to record. */
+  function performUndo() {
+    if (!undoStack.length) return;
+    const { encounterSnapshot, logCountBefore } = undoStack.pop();
+    Encounter.setState(encounterSnapshot);
+    CombatLog.truncateTo(logCountBefore);
+    Storage.saveCombatLog(CombatLog.getAll());
+    selectedForGrouping.clear();
+    updateUndoButtonState();
+    persistAndRerenderEncounter();
+  }
+
   function persistAndRerenderEncounter() {
     Storage.saveEncounter(Encounter.getState());
     renderEncounter();
@@ -1160,6 +1350,11 @@ const UI = (() => {
       } else {
         forceCloseStatblockPopover();
       }
+    }
+    // Keep the Combat Log panel's content current if it's open, so a new
+    // entry from whatever action just ran appears immediately.
+    if (el.combatLogPanel.style.display !== 'none') {
+      renderCombatLogBody();
     }
   }
 
@@ -1176,20 +1371,41 @@ const UI = (() => {
    */
   function broadcastPlayerView() {
     const state = Encounter.getState();
-    const ordered = Encounter.sortedInstances();
     const activeId = Encounter.getActiveInstanceId();
+
+    // Dead monsters are excluded from the player view entirely -- unlike
+    // players (who may still need their turn for a death save and stay
+    // visible even at 0 HP), monsters have no equivalent mechanic once
+    // dead, and Next Turn already skips them (see encounter.js's
+    // isSkippableForTurnOrder). Filtering them out here keeps the
+    // player-facing list showing only "live" turn order, never a corpse
+    // lingering in the list.
+    const visible = Encounter.sortedInstances().filter((inst) => {
+      return !(inst.sourceType === 'monster' && inst.isDead);
+    });
 
     PlayerViewChannel.send({
       round: state.round,
       activeInstanceId: activeId,
-      combatants: ordered.map((inst) => ({
-        instanceId: inst.instanceId,
-        label: inst.streamLabel || inst.publicName || inst.displayName,
-        initiative: inst.initiative,
-        isActive: inst.instanceId === activeId,
-        isDead: inst.isDead,
-        conditions: inst.conditions,
-      })),
+      combatants: visible.map((inst) => {
+        // Monsters show their real name by default; only an explicitly
+        // anonymized monster falls back to the generic "Nepřítel N"
+        // label. Players are never anonymized -- their streamLabel IS
+        // their real name, so the same expression naturally resolves
+        // correctly for them too without a separate branch.
+        const label = (inst.sourceType === 'monster' && inst.isAnonymized)
+          ? inst.streamLabel
+          : (inst.publicName || inst.displayName);
+
+        return {
+          instanceId: inst.instanceId,
+          label,
+          initiative: inst.initiative,
+          isActive: inst.instanceId === activeId,
+          isDead: inst.isDead,
+          conditions: inst.conditions,
+        };
+      }),
     });
   }
 
@@ -1222,22 +1438,24 @@ const UI = (() => {
     const inst = Encounter.getInstance(instanceId);
     if (!inst) return;
     const name = inst.publicName || inst.displayName;
-    if (!confirm(`Odstranit "${name}" z encounteru? Tuto akci nelze vrátit zpět.`)) return;
+    if (!confirm(`Odstranit "${name}" z encounteru?`)) return;
 
-    Encounter.removeInstance(instanceId);
-    if (selectedInstanceId === instanceId) selectedInstanceId = null;
-    selectedForGrouping.delete(instanceId);
-    if (statblockOpenForId === instanceId) forceCloseStatblockPopover();
+    mutate(`${name} removed from encounter`, () => {
+      Encounter.removeInstance(instanceId);
+      if (selectedInstanceId === instanceId) selectedInstanceId = null;
+      selectedForGrouping.delete(instanceId);
+      if (statblockOpenForId === instanceId) forceCloseStatblockPopover();
 
-    // If this instance was a player mid-"awaiting initiative", drop that
-    // tracking too -- otherwise its library row would keep showing the
-    // confirm input, pointed at an instance that no longer exists.
-    for (const [templateId, awaitingId] of awaitingInitiativeFor) {
-      if (awaitingId === instanceId) {
-        awaitingInitiativeFor.delete(templateId);
-        break;
+      // If this instance was a player mid-"awaiting initiative", drop that
+      // tracking too -- otherwise its library row would keep showing the
+      // confirm input, pointed at an instance that no longer exists.
+      for (const [templateId, awaitingId] of awaitingInitiativeFor) {
+        if (awaitingId === instanceId) {
+          awaitingInitiativeFor.delete(templateId);
+          break;
+        }
       }
-    }
+    });
 
     // Removing a player combatant changes hasPlayerInstance()'s answer for
     // its templateId, which the library row's Add/Added button state
@@ -1247,8 +1465,6 @@ const UI = (() => {
     if (inst.sourceType === 'player') {
       renderPlayerResults();
     }
-
-    persistAndRerenderEncounter();
   }
 
   // -------------------------------------------------------------------
@@ -1261,6 +1477,55 @@ const UI = (() => {
 
     el.addAllPlayersBtn.addEventListener('click', handleAddAllPlayers);
     el.reloadPlayersBtn.addEventListener('click', reloadPlayersFromStorage);
+
+    el.undoBtn.addEventListener('click', performUndo);
+
+    el.combatLogBtn.addEventListener('click', openCombatLogPanel);
+
+    el.combatLogExportBtn.addEventListener('click', () => {
+      const text = CombatLog.exportText();
+      Storage.downloadText(text || 'Log je prázdný.', 'combat-log.txt');
+    });
+
+    el.backupBtn.addEventListener('click', () => {
+      const backup = Storage.exportAllBackup();
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      Storage.downloadJson(backup, `dnd-tracker-backup-${stamp}.json`);
+    });
+
+    el.restoreBtn.addEventListener('click', () => {
+      el.restoreInput.click();
+    });
+
+    el.restoreInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      Storage.readJsonFile(file)
+        .then((json) => {
+          if (!json || json.format !== 'dnd-tracker-backup' || !json.data) {
+            alert('Soubor nevypadá jako platná záloha DM Encounter Trackeru.');
+            return;
+          }
+          if (!confirm('Nahradit aktuální data zálohou? Současný encounter, knihovny a log budou přepsány.')) {
+            return;
+          }
+          Storage.importAllBackup(json);
+          // Every module (MonsterLibrary, PlayerLibrary, SpellLibrary,
+          // Encounter, CombatLog) already loaded its in-memory state at
+          // page startup -- writing the restored data into localStorage
+          // alone wouldn't update any of that. A full reload is the
+          // simplest reliable way to make every module re-initialize
+          // from the newly-restored data, the same way it does on any
+          // normal page load.
+          alert('Záloha byla obnovena. Stránka se nyní znovu načte.');
+          location.reload();
+        })
+        .catch((err) => alert('Nepodařilo se přečíst soubor zálohy: ' + err))
+        .finally(() => {
+          el.restoreInput.value = '';
+        });
+    });
 
     el.playerViewBtn.addEventListener('click', () => {
       // window.open() with a named target reuses an existing window with
@@ -1315,18 +1580,15 @@ const UI = (() => {
     });
 
     el.nextTurnBtn.addEventListener('click', () => {
-      Encounter.nextTurn();
-      persistAndRerenderEncounter();
+      mutate(null, () => Encounter.nextTurn());
     });
 
     el.prevTurnBtn.addEventListener('click', () => {
-      Encounter.previousTurn();
-      persistAndRerenderEncounter();
+      mutate(null, () => Encounter.previousTurn());
     });
 
     el.nextRoundBtn.addEventListener('click', () => {
-      Encounter.nextRound();
-      persistAndRerenderEncounter();
+      mutate(null, () => Encounter.nextRound());
     });
 
     el.newEncounterBtn.addEventListener('click', () => {
@@ -1336,6 +1598,16 @@ const UI = (() => {
         selectedForGrouping.clear();
         awaitingInitiativeFor.clear();
         forceCloseStatblockPopover();
+        // A fresh encounter has nothing to undo back to, and the combat
+        // log is explicitly cleared together with the encounter per the
+        // agreed behavior -- both reset here rather than going through
+        // mutate(), which would otherwise snapshot the now-irrelevant
+        // old state and log a spurious "encounter reset" entry into a
+        // log that's about to be wiped anyway.
+        undoStack = [];
+        updateUndoButtonState();
+        CombatLog.clear();
+        Storage.saveCombatLog(CombatLog.getAll());
         persistAndRerenderEncounter();
         renderPlayerResults();
       }
@@ -1346,14 +1618,18 @@ const UI = (() => {
     // combatants. See encounter.js rollMissingInitiative() for the actual
     // safety rail -- this button is just the trigger.
     el.rollInitiativeBtn.addEventListener('click', () => {
-      Encounter.rollMissingInitiative();
-      persistAndRerenderEncounter();
+      mutate('Rolled missing initiative', () => Encounter.rollMissingInitiative());
     });
 
     el.groupSelectedBtn.addEventListener('click', () => {
-      Encounter.groupSelected(Array.from(selectedForGrouping));
-      selectedForGrouping.clear();
-      persistAndRerenderEncounter();
+      const names = Array.from(selectedForGrouping)
+        .map((id) => Encounter.getInstance(id))
+        .filter(Boolean)
+        .map((i) => i.publicName || i.displayName);
+      mutate(`Grouped: ${names.join(', ')}`, () => {
+        Encounter.groupSelected(Array.from(selectedForGrouping));
+        selectedForGrouping.clear();
+      });
     });
 
     el.exportEncounterBtn.addEventListener('click', () => {
@@ -1377,6 +1653,8 @@ const UI = (() => {
           selectedInstanceId = null;
           awaitingInitiativeFor.clear();
           forceCloseStatblockPopover();
+          undoStack = []; // undoing back to a pre-import state doesn't make sense
+          updateUndoButtonState();
           persistAndRerenderEncounter();
           renderPlayerResults();
           showImportStatus('Encounter byl načten.', 'ok');
@@ -1415,6 +1693,15 @@ const UI = (() => {
       if (e.target.closest && e.target.closest('.statblock-info-btn')) return;
       closeStatblockPopover();
     });
+
+    // Click-outside-to-close for the Combat Log panel, same pin-aware
+    // pattern as the other floating panels.
+    document.addEventListener('click', (e) => {
+      if (el.combatLogPanel.style.display === 'none') return;
+      if (el.combatLogPanel.contains(e.target)) return;
+      if (e.target === el.combatLogBtn) return;
+      combatLogPanel.requestClose();
+    });
   }
 
   // -------------------------------------------------------------------
@@ -1439,7 +1726,22 @@ const UI = (() => {
         return;
       }
 
+      // Same pattern for the Combat Log panel: Escape closes it unless pinned.
+      if (e.key === 'Escape' && el.combatLogPanel.style.display !== 'none' && !combatLogPanel.isPinned()) {
+        combatLogPanel.requestClose();
+        return;
+      }
+
       const typing = isTypingTarget(e.target);
+
+      // Ctrl+Z (or Cmd+Z on Mac) triggers Undo, but only when NOT typing
+      // in a text field -- inside an input/textarea, Ctrl+Z should do the
+      // browser's normal text-edit undo, not the encounter-wide undo.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing) {
+        e.preventDefault();
+        performUndo();
+        return;
+      }
 
       // Ctrl+F or "/" focuses search, even while typing elsewhere (but not while
       // already typing in the search box itself, to avoid double-handling).
@@ -1454,17 +1756,16 @@ const UI = (() => {
 
       if (e.key.toLowerCase() === 'n') {
         e.preventDefault();
-        Encounter.nextTurn();
-        persistAndRerenderEncounter();
+        mutate(null, () => Encounter.nextTurn());
       } else if (e.key.toLowerCase() === 'b') {
         e.preventDefault();
-        Encounter.previousTurn();
-        persistAndRerenderEncounter();
+        mutate(null, () => Encounter.previousTurn());
       } else if (e.key.toLowerCase() === 'k') {
         if (selectedInstanceId) {
           e.preventDefault();
-          Encounter.markDead(selectedInstanceId);
-          persistAndRerenderEncounter();
+          const inst = Encounter.getInstance(selectedInstanceId);
+          const name = inst ? (inst.publicName || inst.displayName) : 'Combatant';
+          mutate(`${name} marked Dead`, () => Encounter.markDead(selectedInstanceId));
         }
       } else if (e.key === 'Delete') {
         if (selectedInstanceId) {
@@ -1497,6 +1798,12 @@ const UI = (() => {
     renderLibraryResults();
     renderPlayerResults();
     renderEncounter();
+    updateUndoButtonState();
+
+    const savedLog = Storage.loadCombatLog();
+    if (Array.isArray(savedLog)) {
+      CombatLog.setAll(savedLog);
+    }
   }
 
   return { init, renderEncounter, renderLibraryResults, renderPlayerResults };

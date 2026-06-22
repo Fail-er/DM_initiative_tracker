@@ -27,6 +27,11 @@
       <div id="spellbook-results" class="spellbook-results" style="display:none"></div>
     </div>
 
+    <button id="undo-btn" class="btn btn-small" type="button" title="Vrátit poslední akci (Ctrl+Z)">↩ Undo</button>
+    <button id="combat-log-btn" class="btn btn-small" type="button" title="Otevřít Combat Log">📜 Log</button>
+    <button id="backup-btn" class="btn btn-small" type="button" title="Stáhnout zálohu všech dat (monstra, hráči, kouzla, encounter, log)">💾 Backup</button>
+    <button id="restore-btn" class="btn btn-small" type="button" title="Obnovit ze zálohy">📤 Restore</button>
+    <input id="restore-input" type="file" accept=".json,application/json" hidden />
     <button id="player-view-btn" class="btn btn-small" type="button" title="Otevřít Player View v novém okně (pro OBS)">📺 Player View</button>
 
     <div class="header-shortcuts">
@@ -36,6 +41,7 @@
       <span><kbd>B</kbd> předchozí tah</span>
       <span><kbd>K</kbd> dead</span>
       <span><kbd>Del</kbd> odstranit</span>
+      <span><kbd>Ctrl+Z</kbd> undo</span>
       <span><kbd>Esc</kbd> zrušit výběr</span>
     </div>
   </header>
@@ -138,6 +144,20 @@
     <div id="spell-card-body" class="spell-card-body"></div>
   </div>
 
+  <!-- Floating Combat Log panel. Internal panel, not a new window.
+       Positioned centrally by ui.js. Hidden by default. -->
+  <div id="combat-log-panel" class="combat-log-panel" style="display:none" role="dialog" aria-label="Combat Log">
+    <div id="combat-log-header" class="combat-log-header panel-header">
+      <span class="combat-log-title">Combat Log</span>
+      <div class="combat-log-header-actions">
+        <button id="combat-log-export-btn" class="btn btn-small" type="button" title="Exportovat log do .txt souboru">⬇ Export TXT</button>
+        <button id="combat-log-pin-btn" class="btn btn-small panel-pin-btn" type="button" title="Připnout (nezavře se kliknutím mimo)">📌</button>
+        <button id="combat-log-close-btn" class="btn btn-small panel-close-btn" type="button" aria-label="Zavřít">&times;</button>
+      </div>
+    </div>
+    <div id="combat-log-body" class="combat-log-body"></div>
+  </div>
+
   <!-- Module scripts, loaded in dependency order. No bundler needed:
        each file defines a global (MonsterLibrary, PlayerLibrary, Encounter,
        Storage, UI, SpellLibrary, SpellUI) that the next file relies on. -->
@@ -148,6 +168,7 @@
   <script src="js/storage.js"></script>
   <script src="js/draggable-panel.js"></script>
   <script src="js/player-view-channel.js"></script>
+  <script src="js/combat-log.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/spell-ui.js"></script>
   <script src="js/app.js"></script>

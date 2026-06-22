@@ -63,6 +63,28 @@ const Encounter = (() => {
     }
     state = newState;
     state.instances = state.instances.map(normalizeInstance);
+
+    // Backward compatibility: monsters loaded from a save predating
+    // streamEnemyNumber/streamLabel get one assigned now, in their
+    // current array order (the closest available stand-in for "order
+    // added," since that wasn't separately recorded before). Continues
+    // the sequence after any monsters that already have a number, so a
+    // partially-old save (e.g. after a previous app version already
+    // assigned some) doesn't renumber what's already stable.
+    let nextNumber = 1;
+    state.instances.forEach((inst) => {
+      if (inst.sourceType === 'monster' && Number.isFinite(inst.streamEnemyNumber)) {
+        nextNumber = Math.max(nextNumber, inst.streamEnemyNumber + 1);
+      }
+    });
+    state.instances.forEach((inst) => {
+      if (inst.sourceType === 'monster' && !Number.isFinite(inst.streamEnemyNumber)) {
+        inst.streamEnemyNumber = nextNumber;
+        inst.streamLabel = `Nepřítel ${nextNumber}`;
+        nextNumber++;
+      }
+    });
+
     if (state.activeInstanceId === undefined) {
       state.activeInstanceId = null;
     }
@@ -98,6 +120,14 @@ const Encounter = (() => {
       inst.groupId = null;
     }
     if (inst.groupId === undefined) inst.groupId = null;
+    // streamLabel for players is just their name -- safe to backfill
+    // per-instance here. Monsters' streamLabel/streamEnemyNumber need
+    // sequential numbering across ALL instances, which can't be done
+    // correctly one instance at a time -- see the dedicated pass in
+    // setState() right after this normalization map.
+    if (inst.sourceType === 'player' && inst.streamLabel === undefined) {
+      inst.streamLabel = inst.displayName;
+    }
     return inst;
   }
 
@@ -120,6 +150,20 @@ const Encounter = (() => {
    * be wrong (it would make Roll Missing Initiative silently link
    * monsters the DM never asked to group).
    */
+  /** Computes the next sequential enemy number for the player-view's
+   *  spoiler-free generic labeling ("Nepřítel N"), counting across ALL
+   *  monster instances in the encounter regardless of template/type --
+   *  so 3 goblins followed by 2 wolves become Nepřítel 1-3 and 4-5, not
+   *  separately-numbered per monster type. Assigned once at add time and
+   *  never recalculated, so it stays stable even if other monsters are
+   *  later removed or initiative reorders the turn list. */
+  function nextEnemyNumber() {
+    const existingNumbers = state.instances
+      .filter((i) => i.sourceType === 'monster' && Number.isFinite(i.streamEnemyNumber))
+      .map((i) => i.streamEnemyNumber);
+    return existingNumbers.length ? Math.max(...existingNumbers) + 1 : 1;
+  }
+
   function addFromTemplate(template, count) {
     const n = Math.max(1, Math.floor(count) || 1);
     const existingOfType = state.instances.filter((i) => i.templateId === template.id);
@@ -129,12 +173,18 @@ const Encounter = (() => {
 
     for (let k = 0; k < n; k++) {
       const name = `${template.name} ${nextIndex}`;
+      const enemyNumber = nextEnemyNumber();
       const inst = {
         instanceId: uid(),
         sourceType: 'monster',
         templateId: template.id,
         displayName: name,
         publicName: name,
+        // Spoiler-free label for the player-view broadcast (bullet:
+        // monsters show as "Nepřítel N", never their real name/type).
+        // Assigned once here and never recalculated.
+        streamEnemyNumber: enemyNumber,
+        streamLabel: `Nepřítel ${enemyNumber}`,
         currentHp: template.hitPoints,
         maxHp: template.hitPoints,
         tempHp: 0,
@@ -173,6 +223,9 @@ const Encounter = (() => {
       templateId: template.id,
       displayName: template.name,
       publicName: template.name,
+      // Players are never anonymized in the player-view broadcast --
+      // their real name is exactly what should show.
+      streamLabel: template.name,
       currentHp: template.currentHp,
       maxHp: template.maxHp,
       tempHp: template.tempHp || 0,

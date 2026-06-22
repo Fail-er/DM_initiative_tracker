@@ -27,6 +27,8 @@
       <div id="spellbook-results" class="spellbook-results" style="display:none"></div>
     </div>
 
+    <button id="player-view-btn" class="btn btn-small" type="button" title="Otevřít Player View v novém okně (pro OBS)">📺 Player View</button>
+
     <div class="header-shortcuts">
       <span><kbd>/</kbd> hledat</span>
       <span><kbd>Alt+S</kbd> spellbook</span>
@@ -113,11 +115,11 @@
   <!-- Floating stat block popover (bullet F). Positioned dynamically near
        the clicked ⓘ icon by ui.js. Hidden by default. -->
   <div id="statblock-popover" class="statblock-popover" style="display:none" role="dialog" aria-label="Stat block">
-    <div class="statblock-popover-header">
+  <div id="statblock-popover-header" class="statblock-popover-header panel-header">
       <span id="statblock-popover-title" class="statblock-popover-title"></span>
       <div class="statblock-popover-header-actions">
-        <button id="statblock-pin-btn" class="btn btn-small" type="button" title="Připnout (nezavře se kliknutím mimo)">📌</button>
-        <button id="statblock-close-btn" class="btn btn-small" type="button" aria-label="Zavřít">&times;</button>
+        <button id="statblock-pin-btn" class="btn btn-small panel-pin-btn" type="button" title="Připnout (nezavře se kliknutím mimo)">📌</button>
+        <button id="statblock-close-btn" class="btn btn-small panel-close-btn" type="button" aria-label="Zavřít">&times;</button>
       </div>
     </div>
     <div id="statblock-popover-body" class="statblock-popover-body"></div>
@@ -126,11 +128,11 @@
   <!-- Floating spell card (bullet C). Internal panel, not a new window.
        Positioned centrally by spell-ui.js. Hidden by default. -->
   <div id="spell-card" class="spell-card" style="display:none" role="dialog" aria-label="Spell card">
-    <div class="spell-card-header">
+    <div id="spell-card-header" class="spell-card-header panel-header">
       <span id="spell-card-title" class="spell-card-title"></span>
       <div class="spell-card-header-actions">
-        <button id="spell-card-pin-btn" class="btn btn-small" type="button" title="Připnout (nezavře se kliknutím mimo)">📌</button>
-        <button id="spell-card-close-btn" class="btn btn-small" type="button" aria-label="Zavřít">&times;</button>
+        <button id="spell-card-pin-btn" class="btn btn-small panel-pin-btn" type="button" title="Připnout (nezavře se kliknutím mimo)">📌</button>
+        <button id="spell-card-close-btn" class="btn btn-small panel-close-btn" type="button" aria-label="Zavřít">&times;</button>
       </div>
     </div>
     <div id="spell-card-body" class="spell-card-body"></div>
@@ -144,6 +146,8 @@
   <script src="js/spell.js"></script>
   <script src="js/encounter.js"></script>
   <script src="js/storage.js"></script>
+  <script src="js/draggable-panel.js"></script>
+  <script src="js/player-view-channel.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/spell-ui.js"></script>
   <script src="js/app.js"></script>

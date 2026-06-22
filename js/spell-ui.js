@@ -19,8 +19,13 @@ const SpellUI = (() => {
   let el = {};
   let activeResults = []; // current overlay result list, for arrow-key navigation
   let highlightedIndex = -1; // -1 = nothing highlighted
-  let cardPinned = false;
   let cardOpenForId = null;
+  let cardPanel = null; // DraggablePanel instance for the LIVE preview slot, created in cacheRefs
+  // Every spell can have its own independently pinned floating card now --
+  // each entry is a DraggablePanel instance spawned via
+  // DraggablePanel.spawnDetached() at the moment the live preview was
+  // pinned. Pinning a SECOND spell no longer destroys the first.
+  let pinnedSpellCardPanels = [];
 
   function cacheRefs() {
     el = {
@@ -30,11 +35,30 @@ const SpellUI = (() => {
       importInput: document.getElementById('spellbook-import-input'),
 
       card: document.getElementById('spell-card'),
+      cardHeader: document.getElementById('spell-card-header'),
       cardTitle: document.getElementById('spell-card-title'),
       cardBody: document.getElementById('spell-card-body'),
       cardCloseBtn: document.getElementById('spell-card-close-btn'),
       cardPinBtn: document.getElementById('spell-card-pin-btn'),
     };
+
+    cardPanel = DraggablePanel.create({
+      panelEl: el.card,
+      headerEl: el.cardHeader,
+      pinBtn: el.cardPinBtn,
+      closeBtn: el.cardCloseBtn,
+      onClose: () => {
+        cardOpenForId = null;
+      },
+      onPinRequested: () => {
+        const rect = el.card.getBoundingClientRect();
+        const detached = DraggablePanel.spawnDetached(el.card, rect.left, rect.top);
+        pinnedSpellCardPanels.push(detached);
+        // The live slot's job is done -- it hands off to the new
+        // independent pinned card and frees itself for the next preview.
+        cardPanel.close();
+      },
+    });
   }
 
   // -------------------------------------------------------------------
@@ -207,14 +231,34 @@ const SpellUI = (() => {
     el.cardTitle.textContent = spell.name;
     el.cardBody.innerHTML = buildSpellCardBody(spell);
     el.cardBody.scrollTop = 0; // bullet J: a newly opened card replaces content -- start scrolled to top
-    el.card.style.display = 'block';
+
+    // No anchor element here (opened from the header, not a specific
+    // row) -- start horizontally centered, replicating what the old
+    // CSS-only centering looked like, then hand off to the panel for
+    // display/clamp/z-index. Width must be read from a CSS custom
+    // property-free measurement, so make it visible first if needed.
+    const wasHidden = el.card.style.display === 'none' || !el.card.style.display;
+    if (wasHidden) el.card.style.display = 'block';
+    const cardWidth = el.card.offsetWidth;
+    const left = (window.innerWidth - cardWidth) / 2;
+    const top = 80;
+
+    cardPanel.showAt(left, top);
   }
 
+  /** Closes the card regardless of pin state. Only ever called from the
+   *  Close button (wired by DraggablePanel itself) or other explicit
+   *  "this must close" call sites (e.g. New Encounter-style resets, if
+   *  any are ever added for the spellbook). Click-outside and Escape go
+   *  through requestCloseSpellCard() instead, which respects pinning. */
   function closeSpellCard() {
-    cardPinned = false;
-    el.cardPinBtn.classList.remove('btn-primary');
-    el.card.style.display = 'none';
-    cardOpenForId = null;
+    cardPanel.close();
+  }
+
+  /** Closes the card ONLY if it isn't pinned -- used by click-outside
+   *  and the non-forced Escape path. */
+  function requestCloseSpellCard() {
+    cardPanel.requestClose();
   }
 
   // -------------------------------------------------------------------
@@ -283,16 +327,15 @@ const SpellUI = (() => {
           closeResultsOverlay();
         }
       } else if (e.key === 'Escape') {
-        // Per bullet A: Escape closes results first; if results are
-        // already closed, it closes an open spell card; if neither is
-        // open, it blurs the search input. Each Escape press does ONE
-        // of these, falling through to the next only when the previous
-        // has nothing to do -- so repeated Escapes step back cleanly
-        // rather than all happening simultaneously on the first press.
+        // Per the agreed behavior: Escape closes the results overlay
+        // first; if results are already closed, it closes an open,
+        // UNPINNED spell card; if the card is pinned (so nothing
+        // closes) or nothing was open, it blurs the search input.
+        // Each Escape press does at most one of these.
         if (el.results.style.display !== 'none') {
           closeResultsOverlay();
-        } else if (cardOpenForId) {
-          closeSpellCard();
+        } else if (cardOpenForId && !cardPanel.isPinned()) {
+          requestCloseSpellCard();
         } else {
           el.searchInput.blur();
         }
@@ -306,11 +349,8 @@ const SpellUI = (() => {
       el.importInput.value = '';
     });
 
-    el.cardCloseBtn.addEventListener('click', closeSpellCard);
-    el.cardPinBtn.addEventListener('click', () => {
-      cardPinned = !cardPinned;
-      el.cardPinBtn.classList.toggle('btn-primary', cardPinned);
-    });
+    // Spell card pin/close/drag are wired by DraggablePanel itself
+    // (created in cacheRefs). Only click-outside needs handling here.
 
     // Click outside the search box / overlay closes the overlay (bullet A).
     document.addEventListener('click', (e) => {
@@ -319,16 +359,15 @@ const SpellUI = (() => {
       closeResultsOverlay();
     });
 
-    // Click outside the spell card closes it, unless pinned (bullet C),
-    // mirroring the existing stat block popover's click-outside behavior.
+    // Click outside the spell card closes it, unless pinned (bullet C).
     document.addEventListener('click', (e) => {
-      if (!cardOpenForId || cardPinned) return;
+      if (!cardOpenForId) return;
       if (el.card.contains(e.target)) return;
       // Don't close if the click is what opened it (a result row) --
       // that listener already handles closing the overlay + opening the
       // card in the same tick, so this guard avoids an immediate re-close.
       if (e.target.closest && e.target.closest('.spellbook-result-row')) return;
-      closeSpellCard();
+      requestCloseSpellCard();
     });
 
     // Global Alt+S shortcut + Escape handling that should work even when
@@ -342,11 +381,11 @@ const SpellUI = (() => {
         return;
       }
       // If focus is elsewhere (not the search input itself, which has its
-      // own Escape handling above) and a spell card is open, Escape still
-      // closes it -- matches the existing stat block popover's global
-      // Escape behavior so the two floating panels feel consistent.
+      // own Escape handling above) and an unpinned spell card is open,
+      // Escape still closes it -- matches the stat block popover's
+      // global Escape behavior so the two floating panels feel consistent.
       if (e.key === 'Escape' && document.activeElement !== el.searchInput && cardOpenForId && !isTypingTarget(e.target)) {
-        closeSpellCard();
+        requestCloseSpellCard();
       }
     });
   }

@@ -227,6 +227,8 @@ body {
   border-bottom: 1px solid var(--border-soft);
   position: sticky;
   top: 0;
+  cursor: move;
+  user-select: none;
 }
 
 .spell-card-title {
@@ -243,6 +245,7 @@ body {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
+  cursor: default;
 }
 
 .spell-card-header-actions .btn {
@@ -1296,6 +1299,8 @@ body {
   border-bottom: 1px solid var(--border-soft);
   position: sticky;
   top: 0;
+  cursor: move;
+  user-select: none;
 }
 
 .statblock-popover-title {
@@ -1312,6 +1317,7 @@ body {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
+  cursor: default;
 }
 
 .statblock-popover-header-actions .btn {

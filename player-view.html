@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Player View — DM Encounter Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="player-view.css" />
+</head>
+<body class="player-view-body">
+
+  <div class="player-view-backdrop"></div>
+
+  <div id="waiting-state" class="player-view-waiting">
+    <div class="player-view-waiting-text">Čeká se na spojení s trackerem...</div>
+    <div class="player-view-waiting-hint">Otevři tracker v jiné záložce a spusť encounter.</div>
+  </div>
+
+  <main id="player-view-main" class="player-view-main" style="display:none">
+    <div class="player-view-round">
+      <span class="player-view-round-label">Kolo</span>
+      <span id="player-view-round-number" class="player-view-round-number">1</span>
+    </div>
+    <div id="player-view-list" class="player-view-list"></div>
+  </main>
+
+  <script src="js/player-view-channel.js"></script>
+  <script src="js/player-view.js"></script>
+</body>
+</html>

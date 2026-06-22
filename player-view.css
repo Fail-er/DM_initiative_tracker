@@ -1,0 +1,245 @@
+/* =========================================================================
+   player-view.css
+   Standalone styling for the OBS-facing player view. Loaded alongside the
+   main style.css (for shared CSS custom properties: colors, fonts), but
+   everything else here is specific to this page -- no panel/button/form
+   styles from the main app apply here, since this page has no controls.
+   ========================================================================= */
+
+.player-view-body {
+  margin: 0;
+  background: var(--bg-ink);
+  color: var(--text-parchment);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Decorative full-bleed backdrop, positioned absolutely behind all
+   content. contain-fit keeps the full ornate frame visible at any
+   window/canvas size rather than cropping it (bars may appear on
+   unusual aspect ratios, which is the deliberate trade-off vs. cover). */
+.player-view-backdrop {
+  position: absolute;
+  inset: 0;
+  background-image: url('assets/initiative-background.png');
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: var(--bg-ink);
+  z-index: 0;
+}
+
+.player-view-waiting {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.player-view-waiting-text {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  color: var(--gold-dim);
+  margin-bottom: 8px;
+}
+
+.player-view-waiting-hint {
+  font-size: 0.95rem;
+}
+
+.player-view-main {
+  /* position/top/left/width/height are set inline by player-view.js,
+     computed from the background image's actual rendered box under
+     background-size:contain -- see applyFrameGeometry(). This keeps the
+     list from ever overlapping the background's thin gold frame line,
+     regardless of window size or aspect ratio. */
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 40px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.player-view-round {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 18px;
+  flex-shrink: 0;
+}
+
+.player-view-round-label {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.player-view-round-number {
+  font-family: var(--font-mono);
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.player-view-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+  /* Scroll functionality stays fully active; only the visible scrollbar
+     is suppressed, per the request. scrollbar-width covers Firefox;
+     the ::-webkit-scrollbar rule below covers Chrome/Edge/Safari (which
+     is what actually matters for OBS, since it embeds Chromium). */
+  scrollbar-width: none;
+}
+
+.player-view-list::-webkit-scrollbar {
+  display: none;
+}
+
+.player-view-empty {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  padding: 40px;
+}
+
+.player-view-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 34px;
+  width: 50%;
+  align-self: center;
+  transition: filter 0.2s ease;
+
+  /* Ornamental 9-slice frame (assets/initiative-row-frame.png). Corners/
+     side gems stay crisp at any row width; only the flat top/bottom/
+     middle bands stretch. Slice values are measured from the source
+     image's alpha channel:
+       - left/right: 132px / 139px (the side gem ornaments)
+       - top: 165px (flush with the diamond spike's base, so the spike
+         itself is NOT in the stretchable middle and never smears)
+       - bottom: 190px (534px from a 724px-tall source image)
+     border-image-width uses a SINGLE uniform scale factor (~0.22x) on
+     all four sides rather than independently-chosen pixel values --
+     scaling left/right and top/bottom by different factors would
+     squash the corner gem ornaments out of their original proportions.
+     This scale was chosen to land the plaque's overall height (at its
+     tallest point, through the diamond spike) around 78px. */
+  border-style: solid;
+  border-width: 36px 31px 42px 29px;
+  border-image-source: url('assets/initiative-row-frame.png');
+  /* `fill` is the key fix here: without it, border-image only paints the
+     9-slice BORDER region and leaves the element's own background to
+     show through underneath the middle -- which was transparent, so the
+     row's center was see-through to whatever sits behind it. `fill`
+     tells the browser to also paint the source image's middle slice
+     into the element's background, preserving the original stone-plaque
+     texture instead of needing a separate flat-color fallback. */
+  border-image-slice: 165 139 190 132 fill;
+  border-image-width: 36px 31px 42px 29px;
+  border-image-repeat: stretch;
+}
+
+/* Same signature intent as the DM tracker's active-turn highlight, just
+   adapted to a frame image instead of a flat-color card: a gold glow
+   that follows the plaque's actual scalloped silhouette (drop-shadow
+   reads the image's alpha shape), rather than a boxy rectangular glow
+   that would look wrong against these rounded/spiked edges. */
+.player-view-row-active {
+  filter: drop-shadow(0 0 10px rgba(201, 168, 118, 0.85)) drop-shadow(0 0 22px rgba(201, 168, 118, 0.45));
+}
+
+.player-view-row-dead {
+  opacity: 0.45;
+}
+
+.player-view-row-dead .player-view-name-text {
+  text-decoration: line-through;
+}
+
+.player-view-initiative {
+  font-family: var(--font-mono);
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--gold);
+  width: 56px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.player-view-main-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.player-view-name {
+  font-size: 1.5rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.player-view-active-marker {
+  color: var(--gold);
+  font-size: 1.3rem;
+}
+
+.player-view-dead-tag {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--red-blood);
+  border: 1px solid var(--red-blood-dim);
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.05em;
+}
+
+.player-view-conditions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.player-view-condition-tag {
+  font-size: 0.85rem;
+  background: var(--bg-ink);
+  border: 1px solid var(--border-strong);
+  color: var(--text-parchment);
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+/* Responsive: shrink gracefully for narrower OBS canvas sizes (e.g. a
+   vertical stream layout) without breaking readability. */
+@media (max-width: 600px) {
+  .player-view-main {
+    padding: 16px;
+  }
+  .player-view-name {
+    font-size: 1.2rem;
+  }
+  .player-view-initiative {
+    font-size: 1.4rem;
+    width: 44px;
+  }
+  .player-view-row {
+    width: 100%;
+    padding: 12px 24px;
+    border-width: 26px 22px 30px 21px;
+    border-image-width: 26px 22px 30px 21px;
+  }
+}

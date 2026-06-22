@@ -114,16 +114,36 @@ const SpellLibrary = (() => {
 
   /**
    * Case-insensitive substring search across every field in
-   * buildSearchBlob. Returns matching templates sorted by name. An empty
-   * query returns everything (callers -- the header search overlay --
-   * are the ones enforcing the "3+ characters" display rule from bullet
-   * A, not the library itself).
+   * buildSearchBlob. Results are ranked in two tiers: spells whose NAME
+   * contains the query come first, followed by spells that only match
+   * elsewhere (school, range, entries text, etc). Within each tier,
+   * results stay alphabetical -- they're filtered from getAll()'s
+   * already-sorted list, and Array.filter preserves relative order, so
+   * no separate sort step is needed here.
+   *
+   * An empty query returns everything (alphabetical, no ranking needed
+   * since there's nothing to rank against). Callers -- the header search
+   * overlay -- are the ones enforcing the "3+ characters" display rule
+   * from bullet A, not the library itself.
    */
   function search(query) {
     const q = (query || '').trim().toLowerCase();
     const all = getAll();
     if (!q) return all;
-    return all.filter((s) => (searchBlobs.get(s.id) || '').includes(q));
+
+    const nameMatches = [];
+    const otherMatches = [];
+    all.forEach((s) => {
+      const blob = searchBlobs.get(s.id) || '';
+      if (!blob.includes(q)) return;
+      if (s.name.toLowerCase().includes(q)) {
+        nameMatches.push(s);
+      } else {
+        otherMatches.push(s);
+      }
+    });
+
+    return [...nameMatches, ...otherMatches];
   }
 
   // -------------------------------------------------------------------

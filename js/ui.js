@@ -34,6 +34,11 @@ const UI = (() => {
   // scenario at the start of a fight).
   let awaitingInitiativeFor = new Map();
 
+  // Reference to the opened Player View window, so clicking the button
+  // again reuses/reloads it instead of opening a duplicate -- see the
+  // click handler in wireTopLevelControls for the full reasoning.
+  let playerViewWindowRef = null;
+
   // Which accordion sections are open in the detail panel, keyed by
   // section key (see ACCORDION_DEFAULTS). Persists across re-renders
   // within the session but resets per newly-selected combatant so each
@@ -42,14 +47,21 @@ const UI = (() => {
   let accordionState = {};
   let accordionStateForInstanceId = null;
 
-  // Floating stat block popover state.
-  let statblockPinned = false;
+  // Floating stat block popover state: WHAT is open (tracked here) is
+  // separate from pin/position/drag state (owned by the DraggablePanel
+  // instance created in cacheRefs, below).
   let statblockOpenForId = null;
   // When the open popover is a library-template preview (not a live
   // encounter combatant), this holds { sourceType, templateId } instead.
   // The two are mutually exclusive -- only one of statblockOpenForId /
   // statblockOpenForTemplate is ever non-null at a time.
   let statblockOpenForTemplate = null;
+  // Every monster/player can have its own independently pinned floating
+  // card now -- each entry is a DraggablePanel instance spawned via
+  // DraggablePanel.spawnDetached() at the moment the live preview was
+  // pinned. Pinning a SECOND monster no longer destroys the first.
+  let pinnedStatblockPanels = [];
+  let statblockPanel = null; // DraggablePanel instance, created in cacheRefs
 
   // ---- DOM refs (filled in init) ----
   let el = {};
@@ -69,6 +81,7 @@ const UI = (() => {
       playerResults: document.getElementById('player-results'),
       addAllPlayersBtn: document.getElementById('add-all-players-btn'),
       reloadPlayersBtn: document.getElementById('reload-players-btn'),
+      playerViewBtn: document.getElementById('player-view-btn'),
 
       turnList: document.getElementById('turn-list'),
       roundCounter: document.getElementById('round-counter'),
@@ -87,11 +100,31 @@ const UI = (() => {
       importStatus: document.getElementById('import-status'),
 
       statblockPopover: document.getElementById('statblock-popover'),
+      statblockHeader: document.getElementById('statblock-popover-header'),
       statblockTitle: document.getElementById('statblock-popover-title'),
       statblockBody: document.getElementById('statblock-popover-body'),
       statblockCloseBtn: document.getElementById('statblock-close-btn'),
       statblockPinBtn: document.getElementById('statblock-pin-btn'),
     };
+
+    statblockPanel = DraggablePanel.create({
+      panelEl: el.statblockPopover,
+      headerEl: el.statblockHeader,
+      pinBtn: el.statblockPinBtn,
+      closeBtn: el.statblockCloseBtn,
+      onClose: () => {
+        statblockOpenForId = null;
+        statblockOpenForTemplate = null;
+      },
+      onPinRequested: () => {
+        const rect = el.statblockPopover.getBoundingClientRect();
+        const detached = DraggablePanel.spawnDetached(el.statblockPopover, rect.left, rect.top);
+        pinnedStatblockPanels.push(detached);
+        // The live slot's job is done -- it hands off to the new
+        // independent pinned card and frees itself for the next preview.
+        statblockPanel.close();
+      },
+    });
   }
 
   // -------------------------------------------------------------------
@@ -1037,7 +1070,9 @@ const UI = (() => {
    *  encounter combatant. Position is computed from the button's bounding
    *  rect, clamped so the popover never overflows the viewport (bullet F:
    *  "internal panel/modal", not a new window, and it should stay fully
-   *  visible regardless of where in the turn list the user clicked). */
+   *  visible regardless of where in the turn list the user clicked).
+   *  Every open resets any prior drag offset -- the panel always starts
+   *  at this anchor-derived position, per the agreed behavior. */
   function openStatblockPopover(instanceId, anchorEl) {
     const inst = Encounter.getInstance(instanceId);
     if (!inst) return;
@@ -1053,10 +1088,10 @@ const UI = (() => {
    *  CombatantInstance involved, used by the left-panel ⓘ buttons so the
    *  DM can preview a monster/player before adding it to the encounter.
    *  Sets statblockOpenForTemplate (not statblockOpenForId) so the
-   *  click-outside/Escape/pin handling and the live-update-on-change
-   *  logic in persistAndRerenderEncounter() can tell the two cases apart
-   *  -- a library preview has nothing in the encounter to stay in sync
-   *  with, so it's simpler and shouldn't try to "live update" itself. */
+   *  click-outside/Escape handling and the live-update-on-change logic in
+   *  persistAndRerenderEncounter() can tell the two cases apart -- a
+   *  library preview has nothing in the encounter to stay in sync with,
+   *  so it's simpler and shouldn't try to "live update" itself. */
   function openLibraryStatblockPopover(sourceType, templateId, anchorEl) {
     const tpl = sourceType === 'player' ? PlayerLibrary.getById(templateId) : MonsterLibrary.getById(templateId);
     if (!tpl) return;
@@ -1068,47 +1103,44 @@ const UI = (() => {
     positionStatblockPopover(anchorEl);
   }
 
-  /** Shared viewport-aware positioning logic for both popover entry points. */
+  /** Computes an anchor-relative position (below the ⓘ button, flipping
+   *  above it if there's no room below) and hands off to the
+   *  DraggablePanel for the actual display/clamp/z-index work. */
   function positionStatblockPopover(anchorEl) {
+    // Make it visible first (display:block) so its real offsetWidth/
+    // offsetHeight are available for the flip-above check below --
+    // showAt() will reset display anyway, but we need a measurement
+    // before computing where to put it.
     el.statblockPopover.style.display = 'block';
 
-    // Measure after making visible (so offsetWidth/Height are real), then
-    // position near the anchor with viewport-edge clamping.
     const anchorRect = anchorEl.getBoundingClientRect();
     const popRect = el.statblockPopover.getBoundingClientRect();
     const margin = 8;
 
     let top = anchorRect.bottom + margin;
-    let left = anchorRect.left;
-
-    if (left + popRect.width > window.innerWidth - margin) {
-      left = window.innerWidth - popRect.width - margin;
-    }
-    if (left < margin) left = margin;
+    const left = anchorRect.left;
 
     if (top + popRect.height > window.innerHeight - margin) {
       // Not enough room below -- flip above the anchor instead.
       top = anchorRect.top - popRect.height - margin;
-      if (top < margin) top = margin; // last resort: clamp to top of viewport
+      if (top < margin) top = margin;
     }
 
-    el.statblockPopover.style.top = `${top}px`;
-    el.statblockPopover.style.left = `${left}px`;
+    statblockPanel.showAt(left, top);
   }
 
+  /** Closes the popover ONLY if it isn't pinned -- used by click-outside
+   *  and the non-forced Escape path. */
   function closeStatblockPopover() {
-    if (statblockPinned) return; // pinned popovers only close via explicit Close/Escape
-    el.statblockPopover.style.display = 'none';
-    statblockOpenForId = null;
-    statblockOpenForTemplate = null;
+    statblockPanel.requestClose();
   }
 
+  /** Force-closes the popover regardless of pin state -- used by the
+   *  Close button (via DraggablePanel directly) and by callers elsewhere
+   *  in this file that need to guarantee the popover is gone (e.g. after
+   *  removing the combatant it's showing). */
   function forceCloseStatblockPopover() {
-    statblockPinned = false;
-    el.statblockPinBtn.classList.remove('btn-primary');
-    el.statblockPopover.style.display = 'none';
-    statblockOpenForId = null;
-    statblockOpenForTemplate = null;
+    statblockPanel.close();
   }
 
   // -------------------------------------------------------------------
@@ -1118,6 +1150,7 @@ const UI = (() => {
   function persistAndRerenderEncounter() {
     Storage.saveEncounter(Encounter.getState());
     renderEncounter();
+    broadcastPlayerView();
     // Keep an open, unpinned popover in sync with live HP/condition changes;
     // re-open it against its own (still-visible) anchor button if present.
     if (statblockOpenForId) {
@@ -1127,6 +1160,55 @@ const UI = (() => {
       } else {
         forceCloseStatblockPopover();
       }
+    }
+  }
+
+  /**
+   * Builds the reduced, spoiler-safe payload for the player-view window
+   * and sends it over PlayerViewChannel. Per the agreed scope, this
+   * INCLUDES: name/streamLabel (monsters always show as "Nepřítel N",
+   * never their real name -- see encounter.js's streamLabel assignment),
+   * initiative value, turn order (already sorted), who's currently
+   * active, conditions, and dead status. This EXCLUDES: HP entirely, AC,
+   * and anything else that isn't on this explicit list -- the player
+   * view is intentionally minimal, not a read-only mirror of the DM's
+   * full turn list.
+   */
+  function broadcastPlayerView() {
+    const state = Encounter.getState();
+    const ordered = Encounter.sortedInstances();
+    const activeId = Encounter.getActiveInstanceId();
+
+    PlayerViewChannel.send({
+      round: state.round,
+      activeInstanceId: activeId,
+      combatants: ordered.map((inst) => ({
+        instanceId: inst.instanceId,
+        label: inst.streamLabel || inst.publicName || inst.displayName,
+        initiative: inst.initiative,
+        isActive: inst.instanceId === activeId,
+        isDead: inst.isDead,
+        conditions: inst.conditions,
+      })),
+    });
+  }
+
+  /** Reloads and refocuses an already-open Player View window. Used by
+   *  both branches of the Player View button click handler -- whether
+   *  the window was already tracked in playerViewWindowRef, or only just
+   *  rediscovered via a same-name window.open() call. Reloading (rather
+   *  than just focusing) is deliberate per the request: it's the "in
+   *  case it's frozen" recovery path, and OBS's Window Capture keeps
+   *  pointing at the same window handle either way since the window
+   *  itself is never closed or recreated. */
+  function reloadAndFocusPlayerView(win) {
+    try {
+      win.location.reload();
+      win.focus();
+    } catch (e) {
+      // Inaccessible for some reason -- shouldn't happen for a
+      // same-origin file this app opened itself, but fail safely rather
+      // than throwing if it does.
     }
   }
 
@@ -1179,6 +1261,46 @@ const UI = (() => {
 
     el.addAllPlayersBtn.addEventListener('click', handleAddAllPlayers);
     el.reloadPlayersBtn.addEventListener('click', reloadPlayersFromStorage);
+
+    el.playerViewBtn.addEventListener('click', () => {
+      // window.open() with a named target reuses an existing window with
+      // that same name if one is still open, rather than creating a new
+      // one -- exactly what's needed so OBS's Window Capture (which is
+      // bound to a specific window handle) doesn't need remapping every
+      // time this button is clicked. The tracked reference lets us go
+      // one step further and explicitly reload it (per the request: "in
+      // case it's frozen") rather than just refocusing an existing tab.
+      if (playerViewWindowRef && !playerViewWindowRef.closed) {
+        reloadAndFocusPlayerView(playerViewWindowRef);
+      } else {
+        // playerViewWindowRef is null here either because this is the
+        // first click ever, OR because the main tracker page itself was
+        // reloaded (resetting this script's memory) while a player-view
+        // window from an earlier session is still open. window.open()
+        // with the same name finds that real window either way -- the
+        // browser tracks window names independently of this variable --
+        // but we still need to detect "found an existing one" vs "just
+        // created a blank new one" to know whether to reload it.
+        const opened = window.open('player-view.html', 'dnd-tracker-player-view', 'width=900,height=700');
+        playerViewWindowRef = opened;
+        let alreadyHadContent = false;
+        try {
+          alreadyHadContent = !!(opened && opened.location && opened.location.href && opened.location.href.includes('player-view.html'));
+        } catch (e) {
+          alreadyHadContent = false; // inaccessible -- treat as a fresh window, no reload needed
+        }
+        if (alreadyHadContent) {
+          reloadAndFocusPlayerView(opened);
+        }
+      }
+
+      // BroadcastChannel doesn't replay past messages to a listener that
+      // subscribes after they were sent -- a freshly (re)loaded player-view
+      // window would otherwise sit on its "waiting for connection" state
+      // until the next encounter change. Re-send shortly after, giving
+      // the window's script time to load and attach its listener first.
+      setTimeout(broadcastPlayerView, 300);
+    });
 
     // Bullet B: auto-reload when another tab/window (typically
     // player-editor.html) writes to the players localStorage key. The
@@ -1277,18 +1399,16 @@ const UI = (() => {
 
     el.searchInput.addEventListener('input', renderLibraryResults);
 
-    // Floating stat block popover controls.
-    el.statblockCloseBtn.addEventListener('click', forceCloseStatblockPopover);
-    el.statblockPinBtn.addEventListener('click', () => {
-      statblockPinned = !statblockPinned;
-      el.statblockPinBtn.classList.toggle('btn-primary', statblockPinned);
-    });
+    // Floating stat block popover: pin/close/drag are wired by
+    // DraggablePanel itself (created in cacheRefs). Only click-outside
+    // needs handling here.
 
     // Click-outside-to-close: ignore clicks that originated on a ⓘ button
     // (those are handled by their own listener, which opens/repositions
     // the popover for a *different* combatant/template) or inside the
     // popover itself. Works the same whether the open popover is a live
-    // encounter combatant or a library-template preview.
+    // encounter combatant or a library-template preview. Pinned popovers
+    // are left alone -- requestClose() is a no-op while pinned.
     document.addEventListener('click', (e) => {
       if (!statblockOpenForId && !statblockOpenForTemplate) return;
       if (el.statblockPopover.contains(e.target)) return;
@@ -1308,11 +1428,14 @@ const UI = (() => {
 
   function wireKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-      // Escape: close an open floating stat block first (even if pinned --
-      // Escape is an explicit close per bullet F), otherwise fall through
-      // to clearing selection as before.
-      if (e.key === 'Escape' && (statblockOpenForId || statblockOpenForTemplate)) {
-        forceCloseStatblockPopover();
+      // Escape: close an open floating stat block first -- but only if
+      // it isn't pinned (pinned panels only close via their Close
+      // button, per the agreed behavior). If it WAS open and unpinned,
+      // closing it is the only thing this Escape press does. If it's
+      // pinned (so nothing closed), or nothing was open, fall through to
+      // the selection-clearing behavior below instead of doing nothing.
+      if (e.key === 'Escape' && (statblockOpenForId || statblockOpenForTemplate) && !statblockPanel.isPinned()) {
+        closeStatblockPopover();
         return;
       }
 

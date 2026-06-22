@@ -95,6 +95,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  padding: 10px 0;
   overflow-y: auto;
   /* Scroll functionality stays fully active; only the visible scrollbar
      is suppressed, per the request. scrollbar-width covers Firefox;
@@ -158,7 +159,7 @@
    reads the image's alpha shape), rather than a boxy rectangular glow
    that would look wrong against these rounded/spiked edges. */
 .player-view-row-active {
-  filter: drop-shadow(0 0 10px rgba(201, 168, 118, 0.85)) drop-shadow(0 0 22px rgba(201, 168, 118, 0.45));
+  filter: drop-shadow(0 0 5px rgba(201, 168, 118, 0.85)) drop-shadow(0 0 11px rgba(201, 168, 118, 0.45));
 }
 
 .player-view-row-dead {

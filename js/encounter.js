@@ -39,13 +39,50 @@ const Encounter = (() => {
   const CONDITIONS = [
     'Prone', 'Grappled', 'Restrained', 'Poisoned', 'Frightened',
     'Charmed', 'Paralyzed', 'Stunned', 'Unconscious', 'Invisible',
-    'Blinded', 'Deafened',
+    'Blinded', 'Deafened', 'Concentration',
   ];
+
+  const DURATION_TYPES = ['manual', 'rounds', 'startOfTurn', 'endOfTurn', 'saveEnds'];
+
+  function conditionUid() {
+    return 'cond_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+  }
+
+  /** Normalizes a single condition entry into the current object shape
+   *  (bullet A): a plain string becomes { id, name, durationType: 'manual',
+   *  roundsRemaining: null, expired: false }; an already-object condition
+   *  gets any missing field backfilled with the same defaults, so this is
+   *  safe to run unconditionally on both old and current data. */
+  function normalizeCondition(c) {
+    if (typeof c === 'string') {
+      return {
+        id: conditionUid(),
+        name: c,
+        durationType: 'manual',
+        roundsRemaining: null,
+        expired: false,
+        createdRound: -1,
+        createdAtTurnSerial: -1,
+      };
+    }
+    if (c.id === undefined) c.id = conditionUid();
+    if (c.durationType === undefined || !DURATION_TYPES.includes(c.durationType)) c.durationType = 'manual';
+    if (c.roundsRemaining === undefined) c.roundsRemaining = null;
+    if (c.expired === undefined) c.expired = false;
+    // -1 never matches a real turnSerial (which starts at 0 and only
+    // increases), so a condition predating this tracking is always
+    // treated as "not created this exact turn" -- safe to expire on its
+    // next relevant check rather than being mistakenly protected by the
+    // same-turn-serial guard meant for freshly-added conditions.
+    if (c.createdRound === undefined) c.createdRound = -1;
+    if (c.createdAtTurnSerial === undefined) c.createdAtTurnSerial = -1;
+    return c;
+  }
 
   let state = createEmpty();
 
   function createEmpty() {
-    return { round: 1, activeInstanceId: null, instances: [] };
+    return { round: 1, activeInstanceId: null, turnSerial: 0, instances: [] };
   }
 
   function uid() {
@@ -89,6 +126,7 @@ const Encounter = (() => {
       state.activeInstanceId = null;
     }
     if (typeof state.round !== 'number') state.round = 1;
+    if (typeof state.turnSerial !== 'number') state.turnSerial = 0;
   }
 
   /**
@@ -109,6 +147,13 @@ const Encounter = (() => {
     if (inst.initiativeBonus === undefined) inst.initiativeBonus = 0;
     if (inst.publicName === undefined) inst.publicName = inst.displayName;
     if (inst.conditions === undefined) inst.conditions = [];
+    // Backward compatibility (bullet A/I): old saves store conditions as
+    // plain strings (["Poisoned", "Prone"]). Convert each into the new
+    // object shape. Also defensively fills in any missing field on an
+    // already-object condition, so a condition object from an earlier
+    // version of this feature (e.g. missing roundsRemaining) doesn't
+    // break anything -- every check here is a no-op on fully-current data.
+    inst.conditions = inst.conditions.map(normalizeCondition);
     if (inst.notes === undefined) inst.notes = '';
     if (inst.isDead === undefined) inst.isDead = false;
     if (inst.tempHp === undefined) inst.tempHp = 0;
@@ -500,16 +545,71 @@ const Encounter = (() => {
 
   // ---- Conditions ----------------------------------------------------------------
 
-  function addCondition(instanceId, condition) {
-    const inst = getInstance(instanceId);
-    if (!inst || inst.conditions.includes(condition)) return;
-    inst.conditions.push(condition);
-  }
-
-  function removeCondition(instanceId, condition) {
+  /** Adds a condition to a combatant (bullet A/B/C). `options` lets the
+   *  UI specify a duration type and (for "rounds") how many rounds --
+   *  both default to the bullet C defaults (manual, no rounds) so
+   *  existing call sites that don't pass options still work exactly as
+   *  before. Refuses to add a second condition with the same NAME (same
+   *  behavior as before this feature), even though conditions are no
+   *  longer bare strings -- two "Poisoned" entries on one combatant
+   *  isn't a case this app needs to support. */
+  /** Adds a condition to a combatant, or UPDATES an existing one of the
+   *  same name with new duration settings if it's already present
+   *  (bullet: "stejnou condition nepřidávej duplicitně... aktualizuj její
+   *  duration"). Either way, the condition's expired flag is reset to
+   *  false and its created-at stamps (round/turnSerial) are refreshed to
+   *  now -- re-applying a condition is treated as a fresh application of
+   *  it, not a no-op, even if the name was already present.
+   *
+   *  createdRound/createdAtTurnSerial record exactly when the condition
+   *  was (re-)applied. processStartOfTurnConditions uses
+   *  createdAtTurnSerial to avoid firing in the same turn serial the
+   *  condition was created in (the start-of-turn checkpoint for "this
+   *  exact turn" already passed by the time the DM adds the condition,
+   *  so it must wait for the NEXT start of this combatant's turn).
+   *  endOfTurn/saveEnds do NOT need this check -- the end-of-turn
+   *  checkpoint for the current turn hasn't happened yet, so a condition
+   *  added mid-turn can legitimately expire/remind at the end of that
+   *  same turn. */
+  function addCondition(instanceId, name, options) {
     const inst = getInstance(instanceId);
     if (!inst) return;
-    inst.conditions = inst.conditions.filter((c) => c !== condition);
+
+    const opts = options || {};
+    const durationType = DURATION_TYPES.includes(opts.durationType) ? opts.durationType : 'manual';
+    const roundsRemaining = durationType === 'rounds' && Number.isFinite(opts.roundsRemaining)
+      ? opts.roundsRemaining
+      : null;
+
+    const existing = inst.conditions.find((c) => c.name === name);
+    if (existing) {
+      existing.durationType = durationType;
+      existing.roundsRemaining = roundsRemaining;
+      existing.expired = false;
+      existing.createdRound = state.round;
+      existing.createdAtTurnSerial = state.turnSerial;
+      return;
+    }
+
+    inst.conditions.push({
+      id: conditionUid(),
+      name,
+      durationType,
+      roundsRemaining,
+      expired: false,
+      createdRound: state.round,
+      createdAtTurnSerial: state.turnSerial,
+    });
+  }
+
+  /** Removes a condition by id (not name) -- ids are what the UI's
+   *  remove-button data attributes reference, and are unambiguous even
+   *  in any future scenario where duplicate-named conditions might
+   *  exist. */
+  function removeCondition(instanceId, conditionId) {
+    const inst = getInstance(instanceId);
+    if (!inst) return;
+    inst.conditions = inst.conditions.filter((c) => c.id !== conditionId);
   }
 
   function setNotes(instanceId, text) {
@@ -529,6 +629,78 @@ const Encounter = (() => {
    *  skipped, even at 0 HP/dead, since a player may still need their
    *  turn (e.g. to roll a death save) -- only monsters, which have no
    *  equivalent mechanic, are skipped once dead. */
+  // ---- Condition duration processing (bullet E) --------------------------
+  //
+  // These return arrays of reminder message strings rather than calling
+  // any UI function directly -- this module has no knowledge of toasts
+  // or any other UI concept. ui.js calls these at the right moments
+  // (from nextTurn/previousTurn/nextRound, wired through mutate()) and
+  // displays whatever messages come back via showReminderToast().
+
+  /** Called for the combatant LEAVING their turn. Handles endOfTurn
+   *  (marks expired, returns an "expires now" reminder) and saveEnds
+   *  (never auto-expires -- the DM must resolve the save -- but still
+   *  reminds every time the combatant's turn ends, per bullet E #4). */
+  function processEndOfTurnConditions(inst) {
+    if (!inst) return [];
+    const messages = [];
+    const label = inst.publicName || inst.displayName;
+
+    inst.conditions.forEach((c) => {
+      if (c.durationType === 'endOfTurn' && !c.expired) {
+        c.expired = true;
+        messages.push(`${c.name} on ${label} expires at end of turn.`);
+      } else if (c.durationType === 'saveEnds') {
+        messages.push(`${c.name} on ${label}: repeat save.`);
+      }
+    });
+
+    return messages;
+  }
+
+  /** Called for the combatant BECOMING active. Handles startOfTurn
+   *  (marks expired, returns an "expires at start of turn" reminder). */
+  function processStartOfTurnConditions(inst) {
+    if (!inst) return [];
+    const messages = [];
+    const label = inst.publicName || inst.displayName;
+
+    inst.conditions.forEach((c) => {
+      if (c.durationType !== 'startOfTurn' || c.expired) return;
+      // Don't fire in the exact turn serial the condition was created in
+      // -- that start-of-turn checkpoint already happened before the DM
+      // added it; it needs to wait for this combatant's NEXT turn.
+      if (c.createdAtTurnSerial === state.turnSerial) return;
+      c.expired = true;
+      messages.push(`${c.name} on ${label} expires at start of turn.`);
+    });
+
+    return messages;
+  }
+
+  /** Decrements roundsRemaining for every "rounds"-duration condition on
+   *  every combatant in the encounter, run once per round transition
+   *  (whether reached via repeated nextTurn() wraps or a direct
+   *  nextRound() jump). When a count reaches 0, marks it expired and
+   *  returns an "expires now" reminder -- the condition is NOT removed
+   *  (per bullet E: "DM removes it manually"), it just stops counting
+   *  down further (clamped at 0, never goes negative). */
+  function decrementRoundsConditions() {
+    const messages = [];
+    state.instances.forEach((inst) => {
+      const label = inst.publicName || inst.displayName;
+      inst.conditions.forEach((c) => {
+        if (c.durationType !== 'rounds' || c.expired || !Number.isFinite(c.roundsRemaining)) return;
+        c.roundsRemaining = Math.max(0, c.roundsRemaining - 1);
+        if (c.roundsRemaining === 0) {
+          c.expired = true;
+          messages.push(`${c.name} on ${label} expires now.`);
+        }
+      });
+    });
+    return messages;
+  }
+
   function isSkippableForTurnOrder(inst) {
     return inst.sourceType === 'monster' && inst.isDead === true;
   }
@@ -551,6 +723,14 @@ const Encounter = (() => {
    *  regardless of whether the DM got there one step at a time or used
    *  nextRound() to jump there directly.
    *
+   *  Also processes condition durations (bullet E) in this order:
+   *  endOfTurn/saveEnds for the combatant LEAVING their turn, then
+   *  startOfTurn for whoever BECOMES active, then -- only if a round
+   *  boundary was actually crossed -- decrements every "rounds"
+   *  condition across the whole encounter exactly once. Returns the
+   *  combined list of reminder messages for ui.js to display as toasts;
+   *  this module never displays anything itself.
+   *
    *  If every remaining candidate is skippable (e.g. the entire rest of
    *  the encounter is dead monsters), the loop gives up after one full
    *  pass and lands on the next slot anyway, rather than spinning
@@ -559,7 +739,9 @@ const Encounter = (() => {
    *  etc.), not something this function needs to handle gracefully. */
   function nextTurn() {
     const ordered = sortedInstances();
-    if (!ordered.length) return;
+    if (!ordered.length) return [];
+    state.turnSerial++;
+
     const currentId = getActiveInstanceId();
     const startIdx = ordered.findIndex((i) => i.instanceId === currentId);
 
@@ -571,15 +753,35 @@ const Encounter = (() => {
       if (!isSkippableForTurnOrder(ordered[idx])) break;
     }
 
-    state.activeInstanceId = ordered[idx].instanceId;
-    if (wrapped) state.round++;
+    const leaving = startIdx >= 0 ? ordered[startIdx] : null;
+    const entering = ordered[idx];
+
+    const messages = [];
+    messages.push(...processEndOfTurnConditions(leaving));
+
+    state.activeInstanceId = entering.instanceId;
+    if (wrapped) {
+      state.round++;
+      messages.push(...decrementRoundsConditions());
+    }
+
+    messages.push(...processStartOfTurnConditions(entering));
+    return messages;
   }
 
   /** Steps back to the previous combatant in turn order, skipping over
    *  dead monsters the same way nextTurn() does. Mirrors nextTurn() for
-   *  round-counter purposes too: wrapping backward from the first
-   *  combatant to the last decrements the round counter, clamped at a
-   *  minimum of 1. */
+   *  round-counter purposes: wrapping backward from the first combatant
+   *  to the last decrements the round counter, clamped at a minimum of 1.
+   *
+   *  Deliberately does NOT fire endOfTurn/startOfTurn/saveEnds reminders
+   *  -- stepping backward is a correction tool ("oops, wrong button"),
+   *  not actually re-living a turn, so it would be confusing to re-show
+   *  reminders for a turn transition that's being undone rather than
+   *  taken. It DOES still adjust "rounds" durations symmetrically
+   *  (incrementing back) when crossing a round boundary backward, so the
+   *  count stays consistent if the DM steps back and then forward again
+   *  via nextTurn() rather than getting double-decremented. */
   function previousTurn() {
     const ordered = sortedInstances();
     if (!ordered.length) return;
@@ -595,21 +797,54 @@ const Encounter = (() => {
     }
 
     state.activeInstanceId = ordered[idx].instanceId;
-    if (wrapped) state.round = Math.max(1, state.round - 1);
+    if (wrapped) {
+      state.round = Math.max(1, state.round - 1);
+      // Symmetric undo of decrementRoundsConditions() -- put back the
+      // round that nextTurn() would have consumed, so stepping back and
+      // then forward again doesn't double-decrement a "rounds" duration.
+      state.instances.forEach((inst) => {
+        inst.conditions.forEach((c) => {
+          if (c.durationType === 'rounds' && !c.expired && Number.isFinite(c.roundsRemaining)) {
+            c.roundsRemaining += 1;
+          }
+        });
+      });
+    }
   }
 
-  /** Jumps straight to the top of the turn order and increments the round
-   *  counter. Still useful as an explicit "skip the rest of this round"
-   *  action distinct from stepping through every remaining combatant. */
+  /** Jumps straight to the top of the turn order and increments the
+   *  round counter, per the confirmed exact sequence: endOfTurn/saveEnds
+   *  for whoever is CURRENTLY active (they're the one whose turn is
+   *  being skipped past), then round++, then decrement every "rounds"
+   *  condition once, then jump activeInstanceId to the first combatant
+   *  in turn order, then startOfTurn for THEM. Combatants in between
+   *  (skipped over by jumping straight to round start) get neither
+   *  their endOfTurn nor startOfTurn fired -- Next Round explicitly does
+   *  not simulate every intermediate turn. */
   function nextRound() {
     const ordered = sortedInstances();
-    if (!ordered.length) return;
-    state.activeInstanceId = ordered[0].instanceId;
+    if (!ordered.length) return [];
+    state.turnSerial++;
+
+    const currentId = getActiveInstanceId();
+    const current = ordered.find((i) => i.instanceId === currentId) || null;
+
+    const messages = [];
+    messages.push(...processEndOfTurnConditions(current));
+
     state.round++;
+    messages.push(...decrementRoundsConditions());
+
+    const first = ordered[0];
+    state.activeInstanceId = first.instanceId;
+    messages.push(...processStartOfTurnConditions(first));
+
+    return messages;
   }
 
   return {
     CONDITIONS,
+    DURATION_TYPES,
     createEmpty,
     setState,
     getState,

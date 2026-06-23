@@ -608,7 +608,7 @@ const UI = (() => {
             <div class="hp-bar-fill ${hpBarClass}" style="width:${hpPct}%"></div>
           </div>
           <div class="turn-row-hp-text">AC ${inst.armorClass} &middot; HP ${inst.currentHp}/${inst.maxHp}${inst.tempHp ? ' (+' + inst.tempHp + ' temp)' : ''}</div>
-          ${inst.conditions.length ? `<div class="condition-tags">${inst.conditions.map(c => `<span class="condition-tag">${escapeHtml(c)}</span>`).join('')}</div>` : ''}
+          ${inst.conditions.length ? `<div class="condition-tags">${inst.conditions.map(c => buildConditionChip(c, false)).join('')}</div>` : ''}
         </div>
       `;
 
@@ -757,14 +757,43 @@ const UI = (() => {
     wireAccordionToggles();
   }
 
+  /** Maps a condition's durationType to the short chip suffix from
+   *  bullet C: "rounds" shows the remaining count, the others show a
+   *  fixed abbreviation. "manual" has no suffix at all -- the chip is
+   *  just the condition name, exactly as before this feature existed. */
+  function conditionDurationSuffix(c) {
+    if (c.durationType === 'rounds') return Number.isFinite(c.roundsRemaining) ? String(c.roundsRemaining) : '';
+    if (c.durationType === 'startOfTurn') return 'SOT';
+    if (c.durationType === 'endOfTurn') return 'EOT';
+    if (c.durationType === 'saveEnds') return 'Save';
+    return '';
+  }
+
+  /** Builds one condition chip's HTML. Shared by the turn-row's
+   *  read-only chips and the detail panel's removable chips -- `removable`
+   *  controls whether a remove (×) button is included. Expired
+   *  conditions get a small "!" marker and a muted/red-tinted style
+   *  (bullet C: visually distinct but must not take up much space --
+   *  no "Expired" text label, just the marker). */
+  function buildConditionChip(c, removable) {
+    const suffix = conditionDurationSuffix(c);
+    const label = c.name === 'Concentration' ? 'Conc.' : c.name;
+    const text = suffix ? `${escapeHtml(label)} · ${escapeHtml(suffix)}` : escapeHtml(label);
+    const expiredClass = c.expired ? ' condition-tag-expired' : '';
+    const expiredMark = c.expired ? '<span class="condition-tag-expired-mark" title="Vypršelo">!</span>' : '';
+    const removeBtn = removable
+      ? `<button class="condition-remove" data-condition-id="${c.id}" aria-label="Odebrat stav ${escapeHtml(c.name)}">&times;</button>`
+      : '';
+    return `<span class="condition-tag${removable ? ' condition-tag-removable' : ''}${expiredClass}" data-condition-id="${c.id}">${expiredMark}${text}${removeBtn}</span>`;
+  }
+
   /** Shared header + stat row + HP block + conditions, used by both monster
    *  and player detail rendering so the fast-access controls (HP buttons,
    *  the three quick-HP fields, initiative, conditions) look and behave
    *  identically regardless of combatant type. */
   function renderQuickStatsAndHp(inst, subtitle) {
-    const conditionOptions = Encounter.CONDITIONS
-      .filter((c) => !inst.conditions.includes(c))
-      .map((c) => `<option value="${c}">${c}</option>`)
+    const conditionAllOptions = Encounter.CONDITIONS
+      .map((c) => `<option value="${c}">${c === 'Concentration' ? 'Concentration (Conc.)' : c}</option>`)
       .join('');
 
     const canReroll = inst.initiativeMode === 'auto';
@@ -833,16 +862,23 @@ const UI = (() => {
       <div class="detail-section">
         <label class="detail-label">Stavy</label>
         <div class="condition-tags condition-tags-editable">
-          ${inst.conditions.map((c) => `
-            <span class="condition-tag condition-tag-removable" data-condition="${c}">
-              ${escapeHtml(c)} <button class="condition-remove" data-condition="${c}" aria-label="Odebrat stav ${c}">&times;</button>
-            </span>
-          `).join('') || '<span class="empty-hint-inline">Žádné stavy</span>'}
+          ${inst.conditions.map((c) => buildConditionChip(c, true)).join('') || '<span class="empty-hint-inline">Žádné stavy</span>'}
         </div>
-        <select id="condition-select" class="condition-select">
-          <option value="">+ Přidat stav...</option>
-          ${conditionOptions}
-        </select>
+        <div class="condition-add-row">
+          <select id="condition-select" class="condition-select">
+            <option value="">Stav...</option>
+            ${conditionAllOptions}
+          </select>
+          <select id="condition-duration-select" class="condition-duration-select" title="Trvání">
+            <option value="manual" selected>Manual</option>
+            <option value="rounds">Rounds</option>
+            <option value="startOfTurn">Start of turn</option>
+            <option value="endOfTurn">End of turn</option>
+            <option value="saveEnds">Save ends</option>
+          </select>
+          <input type="number" id="condition-rounds-input" class="condition-rounds-input" min="1" placeholder="#" style="display:none" title="Počet kol" />
+          <button id="condition-add-btn" class="btn btn-small" type="button">Add</button>
+        </div>
       </div>
     `;
   }
@@ -1001,6 +1037,24 @@ const UI = (() => {
     };
   }
 
+  /** Shows the concentration-check reminder toast (bullet G) if this
+   *  combatant currently has the Concentration condition. Called ONLY
+   *  from actual damage paths (negative HP delta, or a setHp() call that
+   *  lowers current HP) -- never from healing, Max HP, AC changes, or
+   *  adding a condition, per the explicit exclusion list in the spec.
+   *  This module makes no attempt to track WHAT spell the concentration
+   *  is for, nor to clear/adjust it automatically -- it's purely a
+   *  reminder that the DM still has to ask for/resolve the check
+   *  themselves. */
+  function checkConcentrationOnDamage(instanceId, damageAmount) {
+    const inst = Encounter.getInstance(instanceId);
+    if (!inst) return;
+    const hasConcentration = inst.conditions.some((c) => c.name === 'Concentration');
+    if (!hasConcentration) return;
+    const label = inst.publicName || inst.displayName;
+    showReminderToast(`Concentration check for ${label}, damage ${damageAmount}.`);
+  }
+
   function wireDetailEvents(inst) {
     const name = inst.publicName || inst.displayName;
 
@@ -1041,6 +1095,7 @@ const UI = (() => {
           ? `${name} took ${-delta} damage`
           : `${name} healed ${delta}`;
         mutate(hpChangeMessage(inst.instanceId, baseMsg), () => Encounter.applyDelta(inst.instanceId, delta));
+        if (delta < 0) checkConcentrationOnDamage(inst.instanceId, -delta);
       });
     });
 
@@ -1064,6 +1119,7 @@ const UI = (() => {
       const n = parseInt(minusInput.value, 10);
       if (Number.isFinite(n) && n > 0) {
         mutate(hpChangeMessage(inst.instanceId, `${name} took ${n} damage`), () => Encounter.applyDelta(inst.instanceId, -n));
+        checkConcentrationOnDamage(inst.instanceId, n);
         minusInput.value = '';
       }
     });
@@ -1083,23 +1139,52 @@ const UI = (() => {
       if (e.key !== 'Enter') return;
       const n = parseInt(setInput.value, 10);
       if (Number.isFinite(n)) {
+        const hpBefore = Encounter.getInstance(inst.instanceId).currentHp;
         mutate(hpChangeMessage(inst.instanceId, `${name} HP set to ${n}`), () => Encounter.setHp(inst.instanceId, n));
+        if (n < hpBefore) checkConcentrationOnDamage(inst.instanceId, hpBefore - n);
         setInput.value = '';
       }
     });
 
     const conditionSelect = document.getElementById('condition-select');
-    conditionSelect.addEventListener('change', () => {
-      if (conditionSelect.value) {
-        const condition = conditionSelect.value;
-        mutate(`${name} gained ${condition}`, () => Encounter.addCondition(inst.instanceId, condition));
-      }
+    const durationSelect = document.getElementById('condition-duration-select');
+    const roundsInput = document.getElementById('condition-rounds-input');
+    const addConditionBtn = document.getElementById('condition-add-btn');
+
+    durationSelect.addEventListener('change', () => {
+      roundsInput.style.display = durationSelect.value === 'rounds' ? '' : 'none';
+    });
+
+    addConditionBtn.addEventListener('click', () => {
+      const conditionName = conditionSelect.value;
+      if (!conditionName) return;
+
+      const durationType = durationSelect.value;
+      const roundsRemaining = durationType === 'rounds' ? parseInt(roundsInput.value, 10) : null;
+      if (durationType === 'rounds' && !Number.isFinite(roundsRemaining)) return; // need a count to proceed
+
+      const suffix = durationType === 'rounds' ? ` (${roundsRemaining} rounds)`
+        : durationType === 'manual' ? ''
+        : ` (${durationType})`;
+      mutate(`${name} gained ${conditionName}${suffix}`, () => {
+        Encounter.addCondition(inst.instanceId, conditionName, { durationType, roundsRemaining });
+      });
+
+      // Reset the form back to its defaults after a successful add, per
+      // the agreed flow -- the next condition added starts fresh rather
+      // than inheriting the previous one's duration settings.
+      conditionSelect.value = '';
+      durationSelect.value = 'manual';
+      roundsInput.value = '';
+      roundsInput.style.display = 'none';
     });
 
     document.querySelectorAll('.condition-remove').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const condition = btn.dataset.condition;
-        mutate(`${name} removed ${condition}`, () => Encounter.removeCondition(inst.instanceId, condition));
+        const conditionId = btn.dataset.conditionId;
+        const removedCondition = inst.conditions.find((c) => c.id === conditionId);
+        const conditionName = removedCondition ? removedCondition.name : 'condition';
+        mutate(`${name} lost ${conditionName}`, () => Encounter.removeCondition(inst.instanceId, conditionId));
       });
     });
 
@@ -1278,6 +1363,16 @@ const UI = (() => {
    * directly and then persistAndRerenderEncounter() can simply wrap
    * both into a single mutate() call instead.
    */
+  /** Displays each reminder message returned by Encounter.nextTurn() /
+   *  nextRound() (condition-duration expirations, save-ends reminders)
+   *  as its own toast. A single turn transition can return several
+   *  messages at once (e.g. a Next Round that both ends one combatant's
+   *  turn and starts another's), so each gets shown independently
+   *  rather than being concatenated into one toast. */
+  function showTurnReminders(messages) {
+    (messages || []).forEach((msg) => showReminderToast(msg));
+  }
+
   function mutate(logMessage, actionFn) {
     const encounterSnapshot = JSON.parse(JSON.stringify(Encounter.getState()));
     const logCountBefore = CombatLog.count();
@@ -1403,7 +1498,10 @@ const UI = (() => {
           initiative: inst.initiative,
           isActive: inst.instanceId === activeId,
           isDead: inst.isDead,
-          conditions: inst.conditions,
+          // Player view shows condition NAMES only -- duration/expired
+          // detail is a DM-only concept, not something to surface to
+          // players/viewers.
+          conditions: inst.conditions.map((c) => c.name),
         };
       }),
     });
@@ -1580,7 +1678,7 @@ const UI = (() => {
     });
 
     el.nextTurnBtn.addEventListener('click', () => {
-      mutate(null, () => Encounter.nextTurn());
+      mutate(null, () => showTurnReminders(Encounter.nextTurn()));
     });
 
     el.prevTurnBtn.addEventListener('click', () => {
@@ -1588,7 +1686,7 @@ const UI = (() => {
     });
 
     el.nextRoundBtn.addEventListener('click', () => {
-      mutate(null, () => Encounter.nextRound());
+      mutate(null, () => showTurnReminders(Encounter.nextRound()));
     });
 
     el.newEncounterBtn.addEventListener('click', () => {
@@ -1756,7 +1854,7 @@ const UI = (() => {
 
       if (e.key.toLowerCase() === 'n') {
         e.preventDefault();
-        mutate(null, () => Encounter.nextTurn());
+        mutate(null, () => showTurnReminders(Encounter.nextTurn()));
       } else if (e.key.toLowerCase() === 'b') {
         e.preventDefault();
         mutate(null, () => Encounter.previousTurn());

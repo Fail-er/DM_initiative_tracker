@@ -858,14 +858,64 @@ body {
 }
 
 .condition-select {
-  margin-top: 8px;
-  width: 100%;
   background: var(--bg-ink);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   color: var(--text-parchment);
   padding: 6px;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  flex: 1 1 110px;
+  min-width: 0;
+}
+
+/* Expired conditions stay visually compact (bullet C: "nesmí to zabrat
+   moc místa") -- a small red-tinted border and a tiny "!" marker, no
+   "Expired" text label that would widen the chip. */
+.condition-tag-expired {
+  border-color: var(--red-blood-dim);
+  color: #c98a8a;
+}
+
+.condition-tag-expired-mark {
+  color: var(--red-blood);
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+
+.condition-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  align-items: center;
+}
+
+.condition-duration-select {
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-parchment);
+  padding: 6px;
+  font-size: 0.74rem;
+  flex: 1 1 90px;
+  min-width: 0;
+}
+
+.condition-rounds-input {
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-parchment);
+  font-family: var(--font-mono);
+  padding: 6px;
+  font-size: 0.78rem;
+  width: 44px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+#condition-add-btn {
+  flex-shrink: 0;
 }
 
 /* =========================================================================
@@ -1379,6 +1429,43 @@ body {
   color: var(--text-muted);
   flex-shrink: 0;
   min-width: 110px;
+}
+
+/* =========================================================================
+   Reminder toasts (bullet D) -- small floating notifications, NOT a
+   modal/alert/confirm. Stack in the bottom-right corner; each one
+   manages its own auto-dismiss independently so a burst of several
+   reminders (e.g. from one Next Round) doesn't cut each other short.
+   ========================================================================= */
+
+.reminder-toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1500;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  max-width: 320px;
+}
+
+.reminder-toast {
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--gold-dim);
+  border-radius: var(--radius-md);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  color: var(--text-parchment);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.reminder-toast-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* =========================================================================

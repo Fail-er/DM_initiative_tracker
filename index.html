@@ -10,13 +10,12 @@
 
   <nav class="icon-rail" aria-label="Navigace">
     <div class="icon-rail-logo" title="DM Encounter Tracker">⚔️</div>
-    <button class="icon-rail-btn" type="button" title="Hráči">👥</button>
-    <button class="icon-rail-btn" type="button" title="Knihovna">📖</button>
-    <button class="icon-rail-btn" type="button" title="Kostky">🎲</button>
-    <button class="icon-rail-btn" type="button" title="Combat">⚔️</button>
-    <button class="icon-rail-btn" type="button" title="Achievements">🏆</button>
-    <button class="icon-rail-btn" type="button" title="Statistiky">📊</button>
-    <button class="icon-rail-btn" type="button" title="Nastavení">⚙️</button>
+    <button id="undo-btn" class="icon-rail-btn" type="button" title="Vrátit poslední akci (Ctrl+Z)">↩️</button>
+    <button id="combat-log-btn" class="icon-rail-btn" type="button" title="Otevřít Combat Log">📜</button>
+    <button id="backup-btn" class="icon-rail-btn" type="button" title="Stáhnout zálohu všech dat (monstra, hráči, kouzla, encounter, log)">💾</button>
+    <button id="restore-btn" class="icon-rail-btn" type="button" title="Obnovit ze zálohy">📤</button>
+    <input id="restore-input" type="file" accept=".json,application/json" hidden />
+    <button id="player-view-btn" class="icon-rail-btn" type="button" title="Otevřít Player View v novém okně (pro OBS)">📺</button>
   </nav>
 
   <div class="app-main-column">
@@ -26,26 +25,23 @@
 
     <div class="spellbook-search-container">
       <div class="spellbook-search-row">
-        <input
-          id="spellbook-search-input"
-          class="spellbook-search-input"
-          type="text"
-          placeholder="Spellbook"
-          autocomplete="off"
-          aria-label="Vyhledat kouzlo"
-        />
+        <div class="spellbook-search-input-wrap">
+          <span class="spellbook-search-icon" aria-hidden="true">🔍</span>
+          <input
+            id="spellbook-search-input"
+            class="spellbook-search-input"
+            type="text"
+            placeholder="Spellbook"
+            autocomplete="off"
+            aria-label="Vyhledat kouzlo"
+          />
+          <button id="spellbook-search-clear-btn" class="spellbook-search-clear-btn" type="button" aria-label="Vymazat vyhledávání" style="display:none">&times;</button>
+        </div>
         <button id="spellbook-import-btn" class="btn btn-small" type="button" title="Import Spells JSON">📥</button>
         <input id="spellbook-import-input" type="file" accept=".json,application/json" hidden />
       </div>
       <div id="spellbook-results" class="spellbook-results" style="display:none"></div>
     </div>
-
-    <button id="undo-btn" class="btn btn-small" type="button" title="Vrátit poslední akci (Ctrl+Z)">↩ Undo</button>
-    <button id="combat-log-btn" class="btn btn-small" type="button" title="Otevřít Combat Log">📜 Log</button>
-    <button id="backup-btn" class="btn btn-small" type="button" title="Stáhnout zálohu všech dat (monstra, hráči, kouzla, encounter, log)">💾 Backup</button>
-    <button id="restore-btn" class="btn btn-small" type="button" title="Obnovit ze zálohy">📤 Restore</button>
-    <input id="restore-input" type="file" accept=".json,application/json" hidden />
-    <button id="player-view-btn" class="btn btn-small" type="button" title="Otevřít Player View v novém okně (pro OBS)">📺 Player View</button>
 
     <div class="header-shortcuts">
       <span><kbd>/</kbd> hledat</span>
@@ -60,6 +56,10 @@
   </header>
 
   <main class="app-layout">
+
+    <!-- LEFT COLUMN: library panel + reminders panel stacked, occupying
+         the grid's first column together. -->
+    <div class="left-column">
 
     <!-- LEFT PANEL: monster + player library, search, import -->
     <section class="panel panel-left" aria-label="Knihovna">
@@ -97,6 +97,22 @@
       </div>
     </section>
 
+    <!-- REMINDERS PANEL: persistent short history (FIFO, capped at a few
+         items) of condition-duration and concentration-check reminders.
+         Replaces the old floating/auto-dismissing toast notifications --
+         see js/toast.js for the ReminderToast module that manages this. -->
+    <section class="panel panel-reminders" aria-label="Připomínky">
+      <div class="panel-header panel-reminders-header">
+        <h2>Připomínky</h2>
+        <button id="clear-reminders-btn" class="btn btn-small" type="button" title="Smazat všechny připomínky">🗑 Smazat</button>
+      </div>
+      <div id="reminders-list" class="reminders-list">
+        <p class="empty-hint">Žádné připomínky.</p>
+      </div>
+    </section>
+
+    </div>
+
     <!-- MIDDLE PANEL: active encounter / turn order -->
     <section class="panel panel-middle" aria-label="Encounter">
       <div class="panel-header panel-header-encounter">
@@ -133,14 +149,6 @@
       </div>
       <div id="turn-list" class="turn-list"></div>
     </section>
-
-    <!-- DOCKING STRIP: empty space sized to match the pinned floating
-         card width (180px = half of the 360px spell card), so the DM
-         has a dedicated place to drag pinned stat blocks/spell cards
-         without them overlapping panel content. Purely visual -- no
-         auto-placement logic, the DM drags cards here manually same as
-         anywhere else on screen. -->
-    <div class="panel-dock-strip" aria-hidden="true"></div>
 
     <!-- RIGHT PANEL: selected combatant detail -->
     <section class="panel panel-right" aria-label="Detail combatanta">

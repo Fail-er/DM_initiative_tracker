@@ -338,16 +338,16 @@ const UI = (() => {
       const row = document.createElement('div');
       row.className = 'monster-row';
       row.innerHTML = `
-        <div class="monster-row-info">
-          <span class="monster-row-name">
-            <span class="monster-row-name-text">${escapeHtml(tpl.name)}</span>
-            <button class="statblock-info-btn" type="button" title="Stat block" aria-label="Zobrazit stat block">ⓘ</button>
-          </span>
+        <span class="monster-row-name">
+          <span class="monster-row-name-text">${escapeHtml(tpl.name)}</span>
+          <button class="statblock-info-btn" type="button" title="Stat block" aria-label="Zobrazit stat block">ⓘ</button>
+        </span>
+        <div class="monster-row-second-line">
           <span class="monster-row-meta">${escapeHtml(tpl.type)} &middot; CR ${escapeHtml(tpl.challengeRating)} &middot; ${escapeHtml(tpl.source)}</span>
-        </div>
-        <div class="monster-row-actions">
-          <input type="number" class="qty-input" value="1" min="1" max="20" aria-label="Počet kusů" />
-          <button class="btn btn-add" type="button">Přidat</button>
+          <div class="monster-row-actions">
+            <input type="number" class="qty-input" value="1" min="1" max="20" aria-label="Počet kusů" />
+            <button class="btn btn-add" type="button">Přidat</button>
+          </div>
         </div>
       `;
       const qtyInput = row.querySelector('.qty-input');
@@ -439,14 +439,14 @@ const UI = (() => {
       }
 
       row.innerHTML = `
-        <div class="monster-row-info">
-          <span class="monster-row-name">
-            <span class="monster-row-name-text">${escapeHtml(p.name)}</span>
-            <button class="statblock-info-btn" type="button" title="Stat block" aria-label="Zobrazit stat block">ⓘ</button>
-          </span>
+        <span class="monster-row-name">
+          <span class="monster-row-name-text">${escapeHtml(p.name)}</span>
+          <button class="statblock-info-btn" type="button" title="Stat block" aria-label="Zobrazit stat block">ⓘ</button>
+        </span>
+        <div class="monster-row-second-line">
           <span class="monster-row-meta">${escapeHtml(p.className)} ${p.level} &middot; AC ${p.armorClass} &middot; HP ${p.currentHp}/${p.maxHp}</span>
+          <div class="monster-row-actions">${actionsHtml}</div>
         </div>
-        <div class="monster-row-actions">${actionsHtml}</div>
       `;
 
       const infoBtn = row.querySelector('.statblock-info-btn');

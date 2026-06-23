@@ -30,6 +30,7 @@ const SpellUI = (() => {
   function cacheRefs() {
     el = {
       searchInput: document.getElementById('spellbook-search-input'),
+      searchClearBtn: document.getElementById('spellbook-search-clear-btn'),
       results: document.getElementById('spellbook-results'),
       importBtn: document.getElementById('spellbook-import-btn'),
       importInput: document.getElementById('spellbook-import-input'),
@@ -161,6 +162,7 @@ const SpellUI = (() => {
    *  displays results. */
   function runSearch() {
     const query = el.searchInput.value.trim();
+    el.searchClearBtn.style.display = el.searchInput.value.length ? '' : 'none';
 
     if (query.length < MIN_QUERY_LENGTH) {
       activeResults = [];
@@ -308,6 +310,15 @@ const SpellUI = (() => {
 
   function wireEvents() {
     el.searchInput.addEventListener('input', runSearch);
+
+    el.searchClearBtn.addEventListener('click', () => {
+      el.searchInput.value = '';
+      el.searchClearBtn.style.display = 'none';
+      activeResults = [];
+      highlightedIndex = -1;
+      closeResultsOverlay();
+      el.searchInput.focus();
+    });
 
     el.searchInput.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowDown') {

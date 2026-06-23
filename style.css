@@ -203,13 +203,47 @@ body {
   gap: 6px;
 }
 
-.spellbook-search-input {
+.spellbook-search-input-wrap {
+  position: relative;
   flex: 1;
+  min-width: 0;
+}
+
+.spellbook-search-icon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gold-dim);
+  font-size: 0.78rem;
+  pointer-events: none;
+}
+
+.spellbook-search-clear-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.spellbook-search-clear-btn:hover {
+  color: var(--gold);
+}
+
+.spellbook-search-input {
+  width: 100%;
   background: var(--bg-ink);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   color: var(--text-parchment);
-  padding: 7px 10px;
+  padding: 7px 28px;
   font-size: 0.85rem;
   font-family: var(--font-body);
   min-width: 0;
@@ -512,7 +546,7 @@ body {
 .app-layout {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(290px, 2fr) 180px minmax(290px, 2fr);
+  grid-template-columns: minmax(220px, 1fr) minmax(420px, 3.5fr) minmax(300px, 1.5fr);
   gap: 1px;
   overflow: hidden;
   background: var(--border-soft);
@@ -527,24 +561,23 @@ body {
   min-height: 0;
 }
 
-/* Empty docking strip for pinned floating cards (stat blocks, spell
-   cards) -- see the comment in index.html. Slightly darker than the
-   surrounding panels and faintly labeled so the empty space reads as
-   intentional, not as a layout bug. */
-.panel-dock-strip {
-  background: var(--bg-ink);
-  position: relative;
+.left-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  gap: 1px;
+  background: var(--border-soft);
 }
 
-.panel-dock-strip::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: repeating-linear-gradient(
-    135deg,
-    transparent 0 14px,
-    rgba(255, 255, 255, 0.012) 14px 15px
-  );
+.left-column .panel-left {
+  flex: 1;
+  min-height: 0;
+}
+
+.left-column .panel-reminders {
+  flex-shrink: 0;
+  height: 220px;
 }
 
 .panel h2 {
@@ -685,15 +718,15 @@ body {
   border-radius: var(--radius-md);
   padding: 8px 10px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .monster-row-info {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  gap: 2px;
 }
 
 .monster-row-name {
@@ -703,18 +736,33 @@ body {
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--text-parchment);
+  width: 100%;
 }
 
 .monster-row-name-text {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Name now has the panel's full width on its own line, so it no
+     longer needs ellipsis truncation -- it wraps normally instead if a
+     name is unusually long, rather than being cut off mid-word. */
+  white-space: normal;
+  overflow-wrap: break-word;
   min-width: 0;
+  flex: 1;
+}
+
+.monster-row-second-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .monster-row-meta {
   font-size: 0.72rem;
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .monster-row-actions {
@@ -1689,40 +1737,74 @@ body {
 }
 
 /* =========================================================================
-   Reminder toasts (bullet D) -- small floating notifications, NOT a
-   modal/alert/confirm. Stack in the bottom-right corner; each one
-   manages its own auto-dismiss independently so a burst of several
-   reminders (e.g. from one Next Round) doesn't cut each other short.
+   Reminders panel (replaces the old floating auto-dismissing toasts) --
+   a persistent, FIFO-capped (max 3) list under the library panel. See
+   js/toast.js for the ReminderToast module managing this.
    ========================================================================= */
 
-.reminder-toast-container {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 1500;
+.panel-reminders {
+  overflow: hidden;
+}
+
+.panel-reminders-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.panel-reminders-header h2 {
+  margin: 0;
+}
+
+.reminders-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  pointer-events: none;
-  max-width: 320px;
+  gap: 6px;
+  overflow-y: auto;
 }
 
-.reminder-toast {
+.reminder-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   background: var(--bg-panel-raised);
-  border: 1px solid var(--gold-dim);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
-  padding: 10px 14px;
-  font-size: 0.82rem;
-  color: var(--text-parchment);
-  opacity: 0;
-  transform: translateY(8px);
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  padding: 8px 10px;
 }
 
-.reminder-toast-visible {
-  opacity: 1;
-  transform: translateY(0);
+.reminder-icon {
+  flex-shrink: 0;
+  font-size: 0.95rem;
+}
+
+.reminder-text {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--text-parchment);
+  min-width: 0;
+}
+
+/* Highlighted words within a reminder's text -- condition name in one
+   accent, combatant name in another, matching the visualization's
+   colored "Frightened on Goblin 2" style rather than plain uniform text. */
+.reminder-condition {
+  color: var(--steel-blue);
+  font-weight: 600;
+}
+
+.reminder-name {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.reminder-time {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
 }
 
 /* =========================================================================

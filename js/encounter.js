@@ -649,9 +649,9 @@ const Encounter = (() => {
     inst.conditions.forEach((c) => {
       if (c.durationType === 'endOfTurn' && !c.expired) {
         c.expired = true;
-        messages.push(`${c.name} on ${label} expires at end of turn.`);
+        messages.push({ kind: 'condition', conditionName: c.name, combatantName: label, suffix: 'expires at end of turn.' });
       } else if (c.durationType === 'saveEnds') {
-        messages.push(`${c.name} on ${label}: repeat save.`);
+        messages.push({ kind: 'condition', conditionName: c.name, combatantName: label, suffix: 'repeat save.', separator: ':' });
       }
     });
 
@@ -672,7 +672,7 @@ const Encounter = (() => {
       // added it; it needs to wait for this combatant's NEXT turn.
       if (c.createdAtTurnSerial === state.turnSerial) return;
       c.expired = true;
-      messages.push(`${c.name} on ${label} expires at start of turn.`);
+      messages.push({ kind: 'condition', conditionName: c.name, combatantName: label, suffix: 'expires at start of turn.' });
     });
 
     return messages;
@@ -694,7 +694,7 @@ const Encounter = (() => {
         c.roundsRemaining = Math.max(0, c.roundsRemaining - 1);
         if (c.roundsRemaining === 0) {
           c.expired = true;
-          messages.push(`${c.name} on ${label} expires now.`);
+          messages.push({ kind: 'condition', conditionName: c.name, combatantName: label, suffix: 'expires now.' });
         }
       });
     });

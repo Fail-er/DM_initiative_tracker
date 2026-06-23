@@ -230,40 +230,42 @@ const UI = (() => {
    * @param speed string
    * @param senses string
    */
-  function renderStatStrip(abilities, saves, passives, speed, senses) {
-    const rows = ABILITY_KEYS.map((key) => {
+  /** Renders the 6-box ability grid (STR-CHA, each showing score+modifier
+   *  on top and the save bonus below) -- matches the visualization's
+   *  box-per-ability layout. Lives directly in the detail panel's
+   *  always-visible header area now, not inside a collapsible accordion
+   *  section (the old "Quick Stats" accordion item has been retired;
+   *  this replaces it). */
+  function renderAbilityGrid(abilities, saves) {
+    const boxes = ABILITY_KEYS.map((key) => {
       const score = abilities[key];
       const mod = abilityMod(score);
       const save = Number.isFinite(saves[key]) ? saves[key] : mod;
       return `
-        <div class="stat-strip-row">
-          <span class="stat-strip-ability">${ABILITY_LABELS[key]}</span>
-          <span class="stat-strip-score">${Number.isFinite(score) ? score : '–'}</span>
-          <span class="stat-strip-mod">${fmtMod(mod)}</span>
-          <span class="stat-strip-save-label">Save</span>
-          <span class="stat-strip-save">${fmtMod(save)}</span>
+        <div class="ability-grid-box">
+          <div class="ability-grid-label">${ABILITY_LABELS[key]}</div>
+          <div class="ability-grid-score">${Number.isFinite(score) ? score : '–'} <span class="ability-grid-mod">${fmtMod(mod)}</span></div>
+          <div class="ability-grid-save">Save <strong>${fmtMod(save)}</strong></div>
         </div>
       `;
     }).join('');
+    return `<div class="ability-grid">${boxes}</div>`;
+  }
 
-    const passiveRows = [
-      ['Passive Perception', passives.perception],
-      passives.insight != null ? ['Passive Insight', passives.insight] : null,
-      passives.investigation != null ? ['Passive Investigation', passives.investigation] : null,
-    ].filter(Boolean).map(([label, val]) => `
-      <div class="stat-strip-passive-row"><span>${label}</span><span>${val}</span></div>
-    `).join('');
-
-    return `
-      <div class="stat-strip">
-        <div class="stat-strip-grid">${rows}</div>
-        <div class="stat-strip-passives">
-          ${passiveRows}
-          ${speed ? `<div class="stat-strip-passive-row"><span>Speed</span><span>${escapeHtml(speed)}</span></div>` : ''}
-          ${senses ? `<div class="stat-strip-passive-row"><span>Senses</span><span>${escapeHtml(senses)}</span></div>` : ''}
-        </div>
-      </div>
-    `;
+  /** Renders the standalone Passive Perception / Speed / Senses line
+   *  that sits below the ability grid, outside the accordion -- these
+   *  are looked up often enough during play that the visualization
+   *  keeps them always visible rather than tucked behind a collapsible
+   *  section. */
+  function renderPassiveRow(passives, speed, senses) {
+    const passiveParts = [
+      `<span class="passive-row-item">Passive Perception <strong>${passives.perception}</strong></span>`,
+      passives.insight != null ? `<span class="passive-row-item">Passive Insight <strong>${passives.insight}</strong></span>` : '',
+      passives.investigation != null ? `<span class="passive-row-item">Passive Investigation <strong>${passives.investigation}</strong></span>` : '',
+      speed ? `<span class="passive-row-item">Speed <strong>${escapeHtml(speed)}</strong></span>` : '',
+      senses ? `<span class="passive-row-item">Senses <strong>${escapeHtml(senses)}</strong></span>` : '',
+    ].filter(Boolean);
+    return `<div class="passive-row">${passiveParts.join('')}</div>`;
   }
 
   // -------------------------------------------------------------------
@@ -285,7 +287,8 @@ const UI = (() => {
       <div class="accordion-section">
         <button class="accordion-header" data-accordion-key="${key}" type="button" aria-expanded="${open}">
           <span class="accordion-arrow">${open ? '▾' : '▸'}</span>
-          <span>${label}</span>
+          <span class="accordion-header-label">${label}</span>
+          <span class="accordion-arrow-end">${open ? '⌃' : '⌄'}</span>
         </button>
         <div class="accordion-body" ${open ? '' : 'style="display:none"'}>${innerHtml}</div>
       </div>
@@ -798,20 +801,46 @@ const UI = (() => {
    *  and player detail rendering so the fast-access controls (HP buttons,
    *  the three quick-HP fields, initiative, conditions) look and behave
    *  identically regardless of combatant type. */
-  function renderQuickStatsAndHp(inst, subtitle) {
-    const conditionAllOptions = Encounter.CONDITIONS
-      .map((c) => `<option value="${c}">${c === 'Concentration' ? 'Concentration (Conc.)' : c}</option>`)
-      .join('');
-
+  /** Renders the new compact always-visible header: a portrait
+   *  placeholder (emoji for now -- wrapped in .detail-portrait so it can
+   *  later be swapped for a real <img> without restructuring anything
+   *  around it, once real artwork exists), name+source badge+DEAD tag,
+   *  an AC "shield" stat, HP (colored red when low), and the editable
+   *  Initiative field. Matches the visualization's header layout. */
+  function renderDetailHeader(inst, subtitle) {
+    const isPlayer = inst.sourceType === 'player';
+    const badgeClass = isPlayer ? 'source-badge source-badge-pc' : 'source-badge source-badge-mon';
+    const badgeText = isPlayer ? 'PC' : 'MON';
+    const portraitIcon = isPlayer ? '🛡️' : '👹';
     const canReroll = inst.initiativeMode === 'auto';
 
+    const hpPct = inst.maxHp > 0 ? Math.max(0, Math.min(100, (inst.currentHp / inst.maxHp) * 100)) : 0;
+    const hpColorClass = hpPct <= 25 ? 'detail-hp-low' : hpPct <= 50 ? 'detail-hp-mid' : '';
+
     return `
-      <div class="detail-header">
-        <h2 class="detail-name">
-          <span class="${inst.sourceType === 'player' ? 'source-badge source-badge-pc' : 'source-badge source-badge-mon'}">${inst.sourceType === 'player' ? 'PC' : 'MON'}</span>
-          ${escapeHtml(inst.publicName || inst.displayName)}${inst.isDead ? ' <span class="dead-tag">DEAD</span>' : ''}
-        </h2>
-        <div class="detail-sub">${subtitle}</div>
+      <div class="detail-header-v2">
+        <div class="detail-portrait">${portraitIcon}</div>
+        <div class="detail-header-main">
+          <h2 class="detail-name">
+            <span class="${badgeClass}">${badgeText}</span>
+            ${escapeHtml(inst.publicName || inst.displayName)}${inst.isDead ? ' <span class="dead-tag">DEAD</span>' : ''}
+          </h2>
+          <div class="detail-sub">${subtitle}</div>
+        </div>
+        <div class="detail-header-stats">
+          <div class="detail-stat-block">
+            <div class="detail-stat-label">AC</div>
+            <div class="detail-stat-shield">${inst.armorClass}</div>
+          </div>
+          <div class="detail-stat-block">
+            <div class="detail-stat-label">HP</div>
+            <div class="detail-stat-value ${hpColorClass}">${inst.currentHp}/${inst.maxHp}</div>
+          </div>
+          <div class="detail-stat-block">
+            <div class="detail-stat-label">Init</div>
+            <div class="detail-stat-value">${inst.initiative === null ? '–' : inst.initiative}</div>
+          </div>
+        </div>
       </div>
 
       <div class="detail-stats">
@@ -829,7 +858,20 @@ const UI = (() => {
           </div>
         </div>
       </div>
+    `;
+  }
 
+  /** Renders the HP controls + conditions section that used to live
+   *  inline in the detail panel -- now returned separately so it can
+   *  become the "HP & Conditions" accordion item's body instead.
+   *  Nothing about the controls themselves changed, only where their
+   *  markup ends up in the overall panel. */
+  function renderHpAndConditionsBody(inst) {
+    const conditionAllOptions = Encounter.CONDITIONS
+      .map((c) => `<option value="${c}">${c === 'Concentration' ? 'Concentration (Conc.)' : c}</option>`)
+      .join('');
+
+    return `
       <div class="detail-hp-block">
         <div class="hp-bar hp-bar-large">
           <div class="hp-bar-fill" style="width:${inst.maxHp > 0 ? Math.max(0, Math.min(100,(inst.currentHp/inst.maxHp)*100)) : 0}%"></div>
@@ -896,19 +938,22 @@ const UI = (() => {
     const tpl = MonsterLibrary.getById(inst.templateId);
     const subtitle = tpl ? `${escapeHtml(tpl.type)} &middot; CR ${escapeHtml(tpl.challengeRating)}` : '';
 
-    const quickStatsHtml = renderQuickStatsAndHp(inst, subtitle);
+    const headerHtml = renderDetailHeader(inst, subtitle);
 
-    let accordionHtml = '';
+    let alwaysVisibleHtml = '';
     if (tpl) {
-      const statStripHtml = renderStatStrip(
-        tpl.abilities, tpl.saves,
+      alwaysVisibleHtml += renderAbilityGrid(tpl.abilities, tpl.saves);
+      alwaysVisibleHtml += renderPassiveRow(
         { perception: passivePerceptionFromSkills(tpl), insight: null, investigation: null },
         tpl.speed, tpl.senses
       );
-      accordionHtml += renderAccordionSection('quickstats', 'Quick Stats', true, statStripHtml);
+    }
 
+    let accordionHtml = renderAccordionSection('hp-conditions', 'HP & Conditions', true, renderHpAndConditionsBody(inst));
+
+    if (tpl) {
       const savesSkillsHtml = renderSavesSkills(tpl.saves, tpl.skills);
-      accordionHtml += renderAccordionSection('saves', 'Saves & Skills', true, savesSkillsHtml);
+      accordionHtml += renderAccordionSection('saves', 'Saves & Skills', false, savesSkillsHtml);
 
       const resistHtml = renderResistancesBlock(tpl.resistances, tpl.immunities, []);
       accordionHtml += renderAccordionSection('resist', 'Resistances / Immunities', false, resistHtml);
@@ -925,7 +970,7 @@ const UI = (() => {
     const notesHtml = `<textarea id="detail-notes" class="detail-notes" placeholder="Poznámky k tomuto monstru...">${escapeHtml(inst.notes)}</textarea>`;
     accordionHtml += renderAccordionSection('notes', 'Notes', false, notesHtml);
 
-    el.detailPanel.innerHTML = quickStatsHtml + accordionHtml;
+    el.detailPanel.innerHTML = headerHtml + alwaysVisibleHtml + `<div class="accordion-plaque">${accordionHtml}</div>`;
   }
 
   /** Monster templates don't carry an explicit passive perception field in
@@ -945,7 +990,7 @@ const UI = (() => {
     const tpl = PlayerLibrary.getById(inst.templateId);
     const subtitle = tpl ? `${escapeHtml(tpl.className)} ${tpl.level}` : '';
 
-    const quickStatsHtml = renderQuickStatsAndHp(inst, subtitle);
+    const headerHtml = renderDetailHeader(inst, subtitle);
 
     const syncButtonHtml = `
       <button id="sync-player-btn" class="btn btn-small sync-player-btn" type="button"
@@ -954,17 +999,20 @@ const UI = (() => {
       </button>
     `;
 
-    let accordionHtml = '';
+    let alwaysVisibleHtml = '';
     if (tpl) {
-      const statStripHtml = renderStatStrip(
-        tpl.abilities, tpl.savingThrows,
+      alwaysVisibleHtml += renderAbilityGrid(tpl.abilities, tpl.savingThrows);
+      alwaysVisibleHtml += renderPassiveRow(
         { perception: tpl.passivePerception, insight: tpl.passiveInsight, investigation: tpl.passiveInvestigation },
         tpl.speed, tpl.senses
       );
-      accordionHtml += renderAccordionSection('quickstats', 'Quick Stats', true, statStripHtml);
+    }
 
+    let accordionHtml = renderAccordionSection('hp-conditions', 'HP & Conditions', true, renderHpAndConditionsBody(inst));
+
+    if (tpl) {
       const skillsHtml = renderSkillsOnly(tpl.skills);
-      accordionHtml += renderAccordionSection('saves', 'Saves & Skills', true, skillsHtml);
+      accordionHtml += renderAccordionSection('saves', 'Saves & Skills', false, skillsHtml);
 
       const abilitiesHtml = tpl.importantAbilities.length ? renderNamedTextList(tpl.importantAbilities) : null;
       accordionHtml += renderAccordionSection('important-abilities', 'Important Abilities', false, abilitiesHtml);
@@ -976,7 +1024,7 @@ const UI = (() => {
     const notesHtml = `<textarea id="detail-notes" class="detail-notes" placeholder="Poznámky...">${escapeHtml(notesValue)}</textarea>`;
     accordionHtml += renderAccordionSection('notes', 'Notes', false, notesHtml);
 
-    el.detailPanel.innerHTML = quickStatsHtml + syncButtonHtml + accordionHtml;
+    el.detailPanel.innerHTML = headerHtml + syncButtonHtml + alwaysVisibleHtml + `<div class="accordion-plaque">${accordionHtml}</div>`;
 
     const syncBtn = document.getElementById('sync-player-btn');
     syncBtn.addEventListener('click', () => {

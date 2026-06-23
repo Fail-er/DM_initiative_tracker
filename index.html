@@ -8,6 +8,19 @@
 </head>
 <body>
 
+  <nav class="icon-rail" aria-label="Navigace">
+    <div class="icon-rail-logo" title="DM Encounter Tracker">⚔️</div>
+    <button class="icon-rail-btn" type="button" title="Hráči">👥</button>
+    <button class="icon-rail-btn" type="button" title="Knihovna">📖</button>
+    <button class="icon-rail-btn" type="button" title="Kostky">🎲</button>
+    <button class="icon-rail-btn" type="button" title="Combat">⚔️</button>
+    <button class="icon-rail-btn" type="button" title="Achievements">🏆</button>
+    <button class="icon-rail-btn" type="button" title="Statistiky">📊</button>
+    <button class="icon-rail-btn" type="button" title="Nastavení">⚙️</button>
+  </nav>
+
+  <div class="app-main-column">
+
   <header class="app-header">
     <h1 class="app-title">DM Encounter Tracker</h1>
 
@@ -121,12 +134,22 @@
       <div id="turn-list" class="turn-list"></div>
     </section>
 
+    <!-- DOCKING STRIP: empty space sized to match the pinned floating
+         card width (180px = half of the 360px spell card), so the DM
+         has a dedicated place to drag pinned stat blocks/spell cards
+         without them overlapping panel content. Purely visual -- no
+         auto-placement logic, the DM drags cards here manually same as
+         anywhere else on screen. -->
+    <div class="panel-dock-strip" aria-hidden="true"></div>
+
     <!-- RIGHT PANEL: selected combatant detail -->
     <section class="panel panel-right" aria-label="Detail combatanta">
       <div id="detail-panel" class="detail-panel"></div>
     </section>
 
   </main>
+
+  </div>
 
   <!-- Floating stat block popover (bullet F). Positioned dynamically near
        the clicked ⓘ icon by ui.js. Hidden by default. -->

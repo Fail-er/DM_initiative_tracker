@@ -76,9 +76,63 @@ html, body {
 
 body {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   height: 100vh;
   overflow: hidden;
+}
+
+.app-main-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* =========================================================================
+   Icon rail -- full-height navigation strip, left of everything else
+   (including the header). Icons are placeholder emoji for now (swappable
+   for real icon assets later); none are wired to any action yet since
+   the visualization didn't specify what each destination should do.
+   ========================================================================= */
+
+.icon-rail {
+  width: 52px;
+  flex-shrink: 0;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  gap: 4px;
+}
+
+.icon-rail-logo {
+  font-size: 1.4rem;
+  margin-bottom: 14px;
+  filter: drop-shadow(0 0 4px rgba(201, 168, 118, 0.3));
+}
+
+.icon-rail-btn {
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.icon-rail-btn:hover {
+  background: var(--bg-panel-raised);
+  border-color: var(--border-strong);
+  color: var(--gold);
 }
 
 /* Respect reduced-motion preference: kill the transitions below. */
@@ -458,7 +512,7 @@ body {
 .app-layout {
   flex: 1;
   display: grid;
-  grid-template-columns: 280px 1.4fr 320px;
+  grid-template-columns: minmax(220px, 1fr) minmax(290px, 2fr) 180px minmax(290px, 2fr);
   gap: 1px;
   overflow: hidden;
   background: var(--border-soft);
@@ -471,6 +525,26 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+/* Empty docking strip for pinned floating cards (stat blocks, spell
+   cards) -- see the comment in index.html. Slightly darker than the
+   surrounding panels and faintly labeled so the empty space reads as
+   intentional, not as a layout bug. */
+.panel-dock-strip {
+  background: var(--bg-ink);
+  position: relative;
+}
+
+.panel-dock-strip::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 14px,
+    rgba(255, 255, 255, 0.012) 14px 15px
+  );
 }
 
 .panel h2 {
@@ -1014,9 +1088,95 @@ body {
   gap: 14px;
 }
 
-.detail-header {
-  border-bottom: 1px solid var(--border-soft);
+.detail-header-v2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.detail-portrait {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--bg-panel);
+  border: 2px solid var(--gold-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  overflow: hidden;
+}
+
+.detail-header-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-header-stats {
+  display: flex;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.detail-stat-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.detail-stat-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+/* AC rendered as an outlined shield shape via clip-path, gold-rimmed,
+   matching the visualization's shield-with-number-inside treatment
+   (rather than a plain number or a generic rounded box). */
+.detail-stat-shield {
+  width: 34px;
+  height: 38px;
+  background: var(--bg-ink);
+  border: 2px solid var(--gold-dim);
+  clip-path: polygon(50% 0%, 100% 15%, 100% 60%, 50% 100%, 0% 60%, 0% 15%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-parchment);
+}
+
+.detail-stat-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-parchment);
+  background: var(--bg-ink);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  min-width: 34px;
+  text-align: center;
+}
+
+/* HP box color escalates with how low current HP is, mirroring the
+   same thresholds used for the turn-row HP bar fill elsewhere. */
+.detail-stat-value.detail-hp-mid {
+  color: var(--gold);
+  border-color: var(--gold-dim);
+}
+
+.detail-stat-value.detail-hp-low {
+  color: var(--red-blood);
+  border-color: var(--red-blood-dim);
+  background: rgba(168, 68, 68, 0.1);
 }
 
 .detail-name {
@@ -1439,22 +1599,27 @@ body {
    Accordion (bullet E) -- collapsible detail sections
    ========================================================================= */
 
-.accordion-section {
-  border: 1px solid var(--border-soft);
+.accordion-plaque {
+  border: 1px solid var(--gold-dim);
   border-radius: var(--radius-md);
   overflow: hidden;
+  background: var(--bg-panel-raised);
+}
+
+.accordion-section + .accordion-section {
+  border-top: 1px solid var(--border-soft);
 }
 
 .accordion-header {
   width: 100%;
-  background: var(--bg-panel-raised);
+  background: none;
   border: none;
   color: var(--text-parchment);
   font-family: var(--font-body);
   font-size: 0.82rem;
   font-weight: 600;
   text-align: left;
-  padding: 8px 10px;
+  padding: 9px 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1465,10 +1630,20 @@ body {
   background: var(--border-soft);
 }
 
+.accordion-header-label {
+  flex: 1;
+}
+
 .accordion-arrow {
   color: var(--gold-dim);
   font-size: 0.7rem;
   width: 10px;
+  flex-shrink: 0;
+}
+
+.accordion-arrow-end {
+  color: var(--gold-dim);
+  font-size: 0.7rem;
   flex-shrink: 0;
 }
 
@@ -1806,6 +1981,53 @@ body {
   text-align: right;
 }
 
+/* Read-only ability box used by the detail panel's always-visible
+   ability grid (renderAbilityGrid() in ui.js) -- distinct from the
+   player-editor's .ability-field/.ability-input-row above, which is an
+   editable form in a different page that happens to share the same
+   outer .ability-grid container class. */
+.ability-grid-box {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 8px 6px;
+  text-align: center;
+}
+
+.ability-grid-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+
+.ability-grid-score {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-parchment);
+}
+
+.ability-grid-mod {
+  font-size: 0.78rem;
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.ability-grid-save {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 4px;
+}
+
+.ability-grid-save strong {
+  color: var(--gold);
+  font-family: var(--font-mono);
+}
+
 /* ---- Saving throw grid ---- */
 
 .save-grid {
@@ -1899,6 +2121,21 @@ body {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.passive-row-item {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 4px 9px;
+}
+
+.passive-row-item strong {
+  color: var(--gold);
+  font-family: var(--font-mono);
+  font-weight: 700;
 }
 
 .passive-row-label {

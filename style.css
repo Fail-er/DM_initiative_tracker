@@ -9,21 +9,48 @@
 
 :root {
   /* ---- palette ---- */
-  --bg-ink: #1a1714;
-  --bg-panel: #221d18;
-  --bg-panel-raised: #2a2420;
-  --border-soft: #3a322a;
-  --border-strong: #4a3f34;
+  /* Cool dark blue-gray base (shifted from the previous warm brown-black
+     "parchment/ink" theme, per the visualization reference). */
+  --bg-ink: #0d1012;
+  --bg-panel: #14181b;
+  --bg-panel-raised: #1b2024;
+  --border-soft: #2a3034;
+  --border-strong: #3a4248;
   --gold: #c9a876;
   --gold-dim: #8a7252;
-  --text-parchment: #e8dfc8;
-  --text-muted: #a89a82;
+  --text-parchment: #e8e2d4;
+  --text-muted: #8d9499;
   --red-blood: #a84444;
   --red-blood-dim: #6e3434;
   --green-heal: #6f8f5f;
   --green-heal-dim: #4d6240;
   --steel-blue: #6f8fa8;
   --steel-blue-dim: #4a6275;
+
+  /* PC/MON source badges get their own dedicated colors now, distinct
+     from --steel-blue/--red-blood which are also used elsewhere for
+     unrelated meanings (HP bars, danger buttons). */
+  --pc-teal: #5fb3ad;
+  --pc-teal-dim: #2d5552;
+  --mon-red: #c97a73;
+  --mon-red-dim: #5c2e2b;
+
+  /* Condition-type accent colors, for the color-coded chips the
+     visualization uses (e.g. Poisoned=green, Frightened=purple,
+     Shield/SOT=blue, Prone/EOT=orange, Paralyzed/Save=purple,
+     Concentration=amber). Conditions aren't hardcoded to specific
+     colors in code -- see the chip-coloring logic in ui.js -- these are
+     just the palette swatches it draws from. */
+  --cond-green: #8aa86a;
+  --cond-green-dim: #3d4a2e;
+  --cond-purple: #9a8ac9;
+  --cond-purple-dim: #423a5c;
+  --cond-blue: #7aa3c9;
+  --cond-blue-dim: #34495c;
+  --cond-orange: #c98a5a;
+  --cond-orange-dim: #5c3d28;
+  --cond-amber: #c9a25a;
+  --cond-amber-dim: #5c4a28;
 
   /* ---- type ---- */
   --font-display: 'Cinzel', Georgia, 'Times New Roman', serif;
@@ -671,8 +698,32 @@ body {
   overflow-y: auto;
 }
 
+.turn-list-header {
+  display: grid;
+  grid-template-columns: 24px 44px 52px 1fr 40px 130px 1.4fr 90px;
+  gap: 10px;
+  padding: 0 10px 6px 10px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.turn-list-header span:not(.turn-list-header-spacer) {
+  text-align: center;
+}
+
+.turn-list-header span:nth-child(4) {
+  text-align: left;
+}
+
+.turn-list-header span:nth-child(7) {
+  text-align: left;
+}
+
 .turn-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 24px 44px 52px 1fr 40px 130px 1.4fr 90px;
   align-items: center;
   gap: 10px;
   background: var(--bg-panel-raised);
@@ -743,13 +794,15 @@ body {
   font-family: var(--font-mono);
   font-size: 1.05rem;
   color: var(--gold);
-  width: 30px;
   text-align: center;
-  flex-shrink: 0;
 }
 
-.turn-row-main {
-  flex: 1;
+.turn-row-type {
+  display: flex;
+  justify-content: center;
+}
+
+.turn-row-name-col {
   min-width: 0;
 }
 
@@ -759,12 +812,13 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 4px;
+  min-width: 0;
 }
 
 .active-marker {
   color: var(--gold);
   font-size: 0.85rem;
+  flex-shrink: 0;
 }
 
 .dead-tag {
@@ -775,13 +829,45 @@ body {
   padding: 1px 4px;
   border-radius: var(--radius-sm);
   letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.turn-row-ac {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--text-parchment);
+  text-align: center;
+}
+
+.turn-row-hp-col {
+  min-width: 0;
 }
 
 .turn-row-hp-text {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.85rem;
+  color: var(--text-parchment);
+  text-align: center;
+  margin-bottom: 3px;
+}
+
+.turn-row-conditions-col {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.turn-row-no-conditions {
   color: var(--text-muted);
-  margin-top: 3px;
+  font-size: 0.8rem;
+}
+
+.turn-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 /* =========================================================================
@@ -790,7 +876,7 @@ body {
 
 .hp-bar {
   width: 100%;
-  height: 7px;
+  height: 5px;
   background: var(--bg-ink);
   border-radius: 4px;
   overflow: hidden;
@@ -1186,15 +1272,15 @@ body {
 }
 
 .source-badge-pc {
-  background: rgba(111, 143, 168, 0.18);
-  color: var(--steel-blue);
-  border: 1px solid var(--steel-blue-dim);
+  background: rgba(95, 179, 173, 0.16);
+  color: var(--pc-teal);
+  border: 1px solid var(--pc-teal-dim);
 }
 
 .source-badge-mon {
-  background: rgba(168, 68, 68, 0.14);
-  color: #c98a8a;
-  border: 1px solid var(--red-blood-dim);
+  background: rgba(201, 122, 115, 0.16);
+  color: var(--mon-red);
+  border: 1px solid var(--mon-red-dim);
 }
 
 /* The ⓘ info button in each turn row: small, unobtrusive, doesn't compete
@@ -1214,10 +1300,6 @@ body {
    row's right edge instead of sitting right after the name. In the
    library list (tight flex container around just the name) this isn't
    applied, so the button sits naturally right after the name. */
-.turn-row-name .statblock-info-btn {
-  margin-left: auto;
-}
-
 .statblock-info-btn:hover {
   color: var(--gold);
 }

@@ -594,21 +594,28 @@ const UI = (() => {
       row.innerHTML = `
         <input type="checkbox" class="group-checkbox" ${isGroupSelected ? 'checked' : ''} aria-label="Vybrat do skupiny" />
         <div class="turn-row-init">${initDisplay}</div>
-        <div class="turn-row-main">
+        <div class="turn-row-type"><span class="${badgeClass}">${badgeText}</span></div>
+        <div class="turn-row-name-col">
           <div class="turn-row-name">
             ${isActive ? '<span class="active-marker" title="Aktivní tah">&#9876;</span>' : ''}
-            <span class="${badgeClass}">${badgeText}</span>
             <span class="turn-row-name-text">${escapeHtml(inst.publicName || inst.displayName)}</span>
             ${inst.isDead ? '<span class="dead-tag">DEAD</span>' : ''}
-            ${anonymizeBtnHtml}
-            <button class="statblock-info-btn" type="button" data-instance-id="${inst.instanceId}" title="Stat block" aria-label="Zobrazit stat block">ⓘ</button>
-            <button class="remove-instance-btn" type="button" data-instance-id="${inst.instanceId}" title="Odstranit z encounteru (Delete)" aria-label="Odstranit z encounteru">🗑</button>
           </div>
+        </div>
+        <div class="turn-row-ac">${inst.armorClass}</div>
+        <div class="turn-row-hp-col">
+          <div class="turn-row-hp-text">${inst.currentHp}&nbsp;/&nbsp;${inst.maxHp}${inst.tempHp ? ' (+' + inst.tempHp + ')' : ''}</div>
           <div class="hp-bar">
             <div class="hp-bar-fill ${hpBarClass}" style="width:${hpPct}%"></div>
           </div>
-          <div class="turn-row-hp-text">AC ${inst.armorClass} &middot; HP ${inst.currentHp}/${inst.maxHp}${inst.tempHp ? ' (+' + inst.tempHp + ' temp)' : ''}</div>
-          ${inst.conditions.length ? `<div class="condition-tags">${inst.conditions.map(c => buildConditionChip(c, false)).join('')}</div>` : ''}
+        </div>
+        <div class="turn-row-conditions-col">
+          ${inst.conditions.length ? `<div class="condition-tags">${inst.conditions.map(c => buildConditionChip(c, false)).join('')}</div>` : '<span class="turn-row-no-conditions">—</span>'}
+        </div>
+        <div class="turn-row-actions">
+          ${anonymizeBtnHtml}
+          <button class="statblock-info-btn" type="button" data-instance-id="${inst.instanceId}" title="Stat block" aria-label="Zobrazit stat block">ⓘ</button>
+          <button class="remove-instance-btn" type="button" data-instance-id="${inst.instanceId}" title="Odstranit z encounteru (Delete)" aria-label="Odstranit z encounteru">🗑</button>
         </div>
       `;
 

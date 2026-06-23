@@ -34,6 +34,75 @@
   z-index: 0;
 }
 
+/* Candle flame glow (ambient animation, not a real flame shape -- just a
+   soft warm light that flickers in place over the candle's position in
+   the static artwork). Positioned by player-view.js's applyFrameGeometry
+   so it stays aligned with the candle regardless of window size. Two
+   separate animations (flicker for fast irregular flame movement, drift
+   for a slower overall breathing glow) are combined so the result reads
+   as organic rather than a single mechanical pulse. */
+.player-view-flame-glow {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  /* Two overlapping radial gradients at different sizes/offsets, rather
+     than one centered gradient on a border-radius:50% box -- a single
+     centered gradient reads as an obviously perfect circle/oval; two
+     overlapping ones break up that geometric look into something closer
+     to an irregular glow. No mix-blend-mode: it was muddying the warm
+     color against the dark backdrop instead of cleanly brightening it. */
+  background:
+    radial-gradient(circle at 50% 65%, rgba(255, 195, 110, 0.85) 0%, rgba(255, 150, 50, 0.45) 22%, transparent 55%),
+    radial-gradient(circle at 45% 55%, rgba(255, 170, 80, 0.5) 0%, transparent 60%);
+  animation: flame-flicker 2.4s ease-in-out infinite;
+}
+
+@keyframes flame-flicker {
+  0%   { opacity: 0.8; }
+  15%  { opacity: 1; }
+  30%  { opacity: 0.65; }
+  45%  { opacity: 0.95; }
+  60%  { opacity: 0.7; }
+  75%  { opacity: 1; }
+  90%  { opacity: 0.85; }
+  100% { opacity: 0.8; }
+}
+
+/* Ground fog -- several soft, slowly-drifting gradient patches rather
+   than one uniform haze, so it reads as uneven wisps consistent with
+   the mist already painted into the static artwork along the bottom of
+   the scene. Drifts horizontally very slowly and breathes in opacity;
+   both durations are deliberately long and not simple round numbers, so
+   the two motions don't fall into a noticeably repeating combined cycle. */
+.player-view-fog {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  /* Explicit radii (in vmin, so they scale with window/canvas size) are
+     essential here: this element is very wide and short (full scene
+     width, ~22% of its height), so an unsized `circle` gradient defaults
+     to farthest-corner sizing -- in a box this disproportionate, that
+     produces enormous circles that overlap into one continuous band
+     rather than staying as separate localized wisps. */
+  background-image:
+    radial-gradient(circle 9vmin at 18% 75%, rgba(210, 210, 220, 0.34) 0%, rgba(210, 210, 220, 0.14) 50%, transparent 100%),
+    radial-gradient(circle 11vmin at 52% 85%, rgba(195, 195, 205, 0.28) 0%, rgba(195, 195, 205, 0.11) 50%, transparent 100%),
+    radial-gradient(circle 10vmin at 85% 70%, rgba(215, 215, 225, 0.36) 0%, rgba(215, 215, 225, 0.15) 50%, transparent 100%);
+  background-repeat: no-repeat;
+  animation: fog-drift 47s ease-in-out infinite, fog-breathe 13s ease-in-out infinite;
+}
+
+@keyframes fog-drift {
+  0%   { background-position: 0% 0%, 0% 0%, 0% 0%; }
+  50%  { background-position: 3% -2%, -2% 2%, 2% -1%; }
+  100% { background-position: 0% 0%, 0% 0%, 0% 0%; }
+}
+
+@keyframes fog-breathe {
+  0%, 100% { opacity: 0.7; }
+  50%      { opacity: 1; }
+}
+
 .player-view-waiting {
   position: relative;
   z-index: 1;

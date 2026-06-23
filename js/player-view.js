@@ -19,6 +19,8 @@
   const main = document.getElementById('player-view-main');
   const roundNumberEl = document.getElementById('player-view-round-number');
   const listEl = document.getElementById('player-view-list');
+  const flameGlow = document.querySelector('.player-view-flame-glow');
+  const fog = document.querySelector('.player-view-fog');
 
   // Source image's pixel dimensions and the measured inner-frame
   // boundary (the area inside the thin gold border line, NOT the wider
@@ -42,6 +44,23 @@
    * exact pixel coordinates for where #player-view-main should sit, so
    * its content never overlaps the background's ornate border.
    */
+  // Candle flame glow position, verified by visually overlaying a test
+  // bounding box on the source image and adjusting until it matched the
+  // actual flame -- the earlier brightness-scan approach had picked up
+  // a false-positive reflection on the nearby sword instead.
+  const FLAME_GLOW = {
+    leftFrac: 0.065, topFrac: 0.788, widthFrac: 0.045, heightFrac: 0.085,
+  };
+
+  // Fog spans the lower portion of the scene where the original artwork
+  // already shows ground mist (visible across the bottom, more
+  // pronounced toward the right pillar). Generous bounds since fog is
+  // inherently diffuse -- it doesn't need pixel-precise alignment the
+  // way the flame glow (a small bright point) does.
+  const FOG_BAND = {
+    leftFrac: 0.0, topFrac: 0.78, widthFrac: 1.0, heightFrac: 0.22,
+  };
+
   function applyFrameGeometry() {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -74,6 +93,19 @@
     main.style.top = `${innerTop}px`;
     main.style.width = `${innerRight - innerLeft}px`;
     main.style.height = `${innerBottom - innerTop}px`;
+
+    // Position the flame glow and fog layers the same way -- mapped onto
+    // the actual rendered image box, not the raw viewport, so they stay
+    // aligned with the artwork regardless of window size/letterboxing.
+    flameGlow.style.left = `${offsetX + renderedWidth * FLAME_GLOW.leftFrac}px`;
+    flameGlow.style.top = `${offsetY + renderedHeight * FLAME_GLOW.topFrac}px`;
+    flameGlow.style.width = `${renderedWidth * FLAME_GLOW.widthFrac}px`;
+    flameGlow.style.height = `${renderedHeight * FLAME_GLOW.heightFrac}px`;
+
+    fog.style.left = `${offsetX + renderedWidth * FOG_BAND.leftFrac}px`;
+    fog.style.top = `${offsetY + renderedHeight * FOG_BAND.topFrac}px`;
+    fog.style.width = `${renderedWidth * FOG_BAND.widthFrac}px`;
+    fog.style.height = `${renderedHeight * FOG_BAND.heightFrac}px`;
   }
 
   window.addEventListener('resize', applyFrameGeometry);

@@ -914,13 +914,34 @@ const UI = (() => {
     return `
       <div class="detail-header-v2">
         <div class="detail-header-top">
+<<<<<<< HEAD
           <div class="detail-portrait">${portraitHtml}</div>
+=======
+          <div class="detail-portrait">${portraitIcon}</div>
+>>>>>>> 4f85083178f8b115d363926610fb353083943434
           <div class="detail-header-main">
             <h2 class="detail-name">
               <span class="${badgeClass}">${badgeText}</span>
               ${escapeHtml(inst.publicName || inst.displayName)}${inst.isDead ? ' <span class="dead-tag">DEAD</span>' : ''}
             </h2>
             <div class="detail-sub">${subtitle}</div>
+<<<<<<< HEAD
+=======
+          </div>
+        </div>
+        <div class="detail-header-stats">
+          <div class="detail-stat-block">
+            <div class="detail-stat-label">AC</div>
+            <div class="detail-stat-icon detail-stat-icon-ac"><span class="detail-stat-icon-value">${inst.armorClass}</span></div>
+          </div>
+          <div class="detail-stat-block">
+            <div class="detail-stat-label">HP</div>
+            <div class="detail-stat-icon detail-stat-icon-hp ${hpColorClass}"><span class="detail-stat-icon-value">${inst.currentHp}/${inst.maxHp}</span></div>
+          </div>
+          <div class="detail-stat-block">
+            <div class="detail-stat-label">Init</div>
+            <div class="detail-stat-icon detail-stat-icon-init"><span class="detail-stat-icon-value">${inst.initiative === null ? '–' : inst.initiative}</span></div>
+>>>>>>> 4f85083178f8b115d363926610fb353083943434
           </div>
         </div>
       </div>

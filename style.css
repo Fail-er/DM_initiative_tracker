@@ -1350,6 +1350,90 @@ body {
   min-width: 0;
 }
 
+<<<<<<< HEAD
+=======
+.detail-header-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.detail-stat-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.detail-stat-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+/* Each stat (AC/HP/Init) is rendered as a value centered over a themed
+   PNG badge (shield/heart/compass respectively) rather than a plain box
+   or CSS clip-path shape -- replaces the earlier shield-via-clip-path
+   approach now that real artwork is available for all three stats. */
+.detail-stat-icon {
+  position: relative;
+  width: 135px;
+  height: 53px;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-parchment);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Positions the value text at the plate's actual center (measured at
+   ~64% of the image's width from the source PNG's badge+plate layout),
+   not the whole element's center -- centering on the full box would
+   push text half onto the circular badge instead. Using absolute
+   positioning + translateX(-50%) (rather than padding + translate on
+   the flex container) keeps the text correctly centered on that exact
+   point regardless of how long the value text is (short "15" vs.
+   longer "23/44" both center identically). */
+.detail-stat-icon-value {
+  position: absolute;
+  left: 64.2%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+
+.detail-stat-icon-ac {
+  background-image: url('assets/icons/stat-ac.png');
+}
+
+.detail-stat-icon-hp {
+  background-image: url('assets/icons/stat-hp.png');
+}
+
+.detail-stat-icon-init {
+  background-image: url('assets/icons/stat-init.png');
+}
+
+/* HP value color escalates with how low current HP is, mirroring the
+   same thresholds used for the turn-row HP bar fill elsewhere. The
+   artwork itself doesn't change (a colored border/background like the
+   old plain box had would clash with the ornate frame art) -- urgency
+   is conveyed by the number's own color and glow instead. */
+.detail-stat-icon-hp.detail-hp-mid {
+  color: var(--gold);
+}
+
+.detail-stat-icon-hp.detail-hp-low {
+  color: #ff8888;
+  text-shadow: 0 0 6px rgba(255, 0, 0, 0.6), 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+>>>>>>> 4f85083178f8b115d363926610fb353083943434
 .detail-name {
   font-family: var(--font-display);
   font-size: 1.1rem;

@@ -819,13 +819,15 @@ const UI = (() => {
 
     return `
       <div class="detail-header-v2">
-        <div class="detail-portrait">${portraitIcon}</div>
-        <div class="detail-header-main">
-          <h2 class="detail-name">
-            <span class="${badgeClass}">${badgeText}</span>
-            ${escapeHtml(inst.publicName || inst.displayName)}${inst.isDead ? ' <span class="dead-tag">DEAD</span>' : ''}
-          </h2>
-          <div class="detail-sub">${subtitle}</div>
+        <div class="detail-header-top">
+          <div class="detail-portrait">${portraitIcon}</div>
+          <div class="detail-header-main">
+            <h2 class="detail-name">
+              <span class="${badgeClass}">${badgeText}</span>
+              ${escapeHtml(inst.publicName || inst.displayName)}${inst.isDead ? ' <span class="dead-tag">DEAD</span>' : ''}
+            </h2>
+            <div class="detail-sub">${subtitle}</div>
+          </div>
         </div>
         <div class="detail-header-stats">
           <div class="detail-stat-block">

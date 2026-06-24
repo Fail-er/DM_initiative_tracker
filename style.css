@@ -1179,10 +1179,16 @@ body {
 
 .detail-header-v2 {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border-soft);
+}
+
+.detail-header-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .detail-portrait {
@@ -1206,7 +1212,8 @@ body {
 
 .detail-header-stats {
   display: flex;
-  gap: 14px;
+  flex-wrap: wrap;
+  gap: 10px;
   flex-shrink: 0;
 }
 
@@ -1230,8 +1237,8 @@ body {
    approach now that real artwork is available for all three stats. */
 .detail-stat-icon {
   position: relative;
-  width: 123px;
-  height: 48px;
+  width: 135px;
+  height: 53px;
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;

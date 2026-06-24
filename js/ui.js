@@ -830,15 +830,15 @@ const UI = (() => {
         <div class="detail-header-stats">
           <div class="detail-stat-block">
             <div class="detail-stat-label">AC</div>
-            <div class="detail-stat-shield">${inst.armorClass}</div>
+            <div class="detail-stat-icon detail-stat-icon-ac"><span class="detail-stat-icon-value">${inst.armorClass}</span></div>
           </div>
           <div class="detail-stat-block">
             <div class="detail-stat-label">HP</div>
-            <div class="detail-stat-value ${hpColorClass}">${inst.currentHp}/${inst.maxHp}</div>
+            <div class="detail-stat-icon detail-stat-icon-hp ${hpColorClass}"><span class="detail-stat-icon-value">${inst.currentHp}/${inst.maxHp}</span></div>
           </div>
           <div class="detail-stat-block">
             <div class="detail-stat-label">Init</div>
-            <div class="detail-stat-value">${inst.initiative === null ? '–' : inst.initiative}</div>
+            <div class="detail-stat-icon detail-stat-icon-init"><span class="detail-stat-icon-value">${inst.initiative === null ? '–' : inst.initiative}</span></div>
           </div>
         </div>
       </div>
@@ -1944,6 +1944,74 @@ const UI = (() => {
     return div.innerHTML;
   }
 
+  /**
+   * Computes and applies app-layout's grid-template-columns as plain
+   * pixel values in JS, recalculated on every resize via ResizeObserver.
+   *
+   * This REPLACES an earlier attempt to do the same thing in pure CSS
+   * via calc(1.5fr - 16px) (with or without minmax() wrapping, with or
+   * without a var()/calc() chain for the offset) -- every variant of
+   * that approach caused the browser to reject the whole
+   * grid-template-columns value as invalid, collapsing all three panels
+   * into a single implicit column (which is why they started stacking
+   * vertically instead of sitting side by side). Computing in JS and
+   * writing only plain px numbers sidesteps that fr/calc interaction
+   * entirely.
+   *
+   * The math: left and middle columns get their exact 1:3.5 proportional
+   * share of the available width (matching what they'd get under the
+   * original pure-fr CSS, before the icon rail ever grew), each clamped
+   * to its own minimum. The right column gets whatever's left over --
+   * so a wider icon rail (or a narrower window) only ever eats into the
+   * right column's share, never redistributes proportionally across all
+   * three the way plain fr units would.
+   */
+  function setupResponsiveColumnWidths() {
+    const layoutEl = document.querySelector('.app-layout');
+    if (!layoutEl) return;
+
+    const LEFT_RATIO = 1;
+    const MIDDLE_RATIO = 3.5;
+    const RIGHT_RATIO = 1.5;
+    const TOTAL_RATIO = LEFT_RATIO + MIDDLE_RATIO + RIGHT_RATIO;
+
+    const LEFT_MIN = 220;
+    const MIDDLE_MIN = 420;
+    const RIGHT_MIN = 284;
+    const GAP = 1; // matches .app-layout's gap: 1px, twice (two gaps between three columns)
+
+    function recompute() {
+      const available = layoutEl.getBoundingClientRect().width - GAP * 2;
+      if (available <= 0) return;
+
+      let left = Math.max(LEFT_MIN, available * (LEFT_RATIO / TOTAL_RATIO));
+      let middle = Math.max(MIDDLE_MIN, available * (MIDDLE_RATIO / TOTAL_RATIO));
+      let right = available - left - middle;
+
+      // If squeezing left/middle to their proportional share already
+      // leaves less than the right column's own minimum, there simply
+      // isn't enough room to honor all three minimums at once -- clamp
+      // right to its minimum and let it overflow/scroll rather than
+      // producing a negative width.
+      if (right < RIGHT_MIN) {
+        right = RIGHT_MIN;
+      }
+
+      layoutEl.style.gridTemplateColumns = `${left}px ${middle}px ${right}px`;
+    }
+
+    recompute();
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(recompute).observe(layoutEl);
+    } else {
+      // Extremely old browsers only -- falls back to window resize,
+      // which won't catch layout-only width changes (e.g. the icon
+      // rail itself resizing without the window resizing), but covers
+      // the common case and avoids throwing on load.
+      window.addEventListener('resize', recompute);
+    }
+  }
+
   function init() {
     cacheRefs();
     wireTopLevelControls();
@@ -1952,6 +2020,7 @@ const UI = (() => {
     renderPlayerResults();
     renderEncounter();
     updateUndoButtonState();
+    setupResponsiveColumnWidths();
 
     const savedLog = Storage.loadCombatLog();
     if (Array.isArray(savedLog)) {

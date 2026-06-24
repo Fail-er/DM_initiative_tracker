@@ -14,6 +14,27 @@
   --bg-ink: #0d1012;
   --bg-panel: #14181b;
   --bg-panel-raised: #1b2024;
+
+  /* Translucent variants of the above, used for surfaces meant to let
+     the body's tiled background texture subtly show through (panels,
+     header, icon rail) rather than fully blocking it out. Alpha is high
+     enough that text/content remains fully legible -- this is meant as
+     a faint hint of texture, not a visible pattern competing with the
+     UI for attention. */
+  --bg-ink-translucent: rgba(13, 16, 18, 0.58);
+  --bg-panel-translucent: rgba(20, 24, 27, 0.54);
+  --bg-panel-raised-translucent: rgba(27, 32, 36, 0.52);
+  --border-soft-translucent: rgba(42, 48, 52, 0.50);
+
+  /* Icon rail panel width tracking: base is the original size before any
+     resizing, current is whatever it actually is now. The difference
+     between them is the exact amount the right COLUMN's width gets
+     reduced by (see .app-layout below) -- so growing/shrinking the
+     panel always comes specifically out of the right column's share,
+     never redistributed proportionally across all three columns via
+     their normal fr-based scaling. */
+  --icon-rail-base-width: 52px;
+  --icon-rail-current-width: 68px;
   --border-soft: #2a3034;
   --border-strong: #3a4248;
   --gold: #c9a876;
@@ -79,6 +100,10 @@ body {
   flex-direction: row;
   height: 100vh;
   overflow: hidden;
+  background-color: var(--bg-ink);
+  background-image: url('assets/background-tile.png');
+  background-size: 700px 700px;
+  background-repeat: repeat;
 }
 
 .app-main-column {
@@ -97,9 +122,9 @@ body {
    ========================================================================= */
 
 .icon-rail {
-  width: 52px;
+  width: var(--icon-rail-current-width);
   flex-shrink: 0;
-  background: var(--bg-panel);
+  background: var(--bg-panel-translucent);
   border-right: 1px solid var(--border-soft);
   display: flex;
   flex-direction: column;
@@ -109,14 +134,14 @@ body {
 }
 
 .icon-rail-logo {
-  font-size: 1.4rem;
+  font-size: 1.82rem;
   margin-bottom: 14px;
   filter: drop-shadow(0 0 4px rgba(201, 168, 118, 0.3));
 }
 
 .icon-rail-btn {
-  width: 36px;
-  height: 36px;
+  width: 47px;
+  height: 47px;
   background: none;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -127,6 +152,18 @@ body {
   align-items: center;
   justify-content: center;
   transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.icon-rail-btn img {
+  width: 34px;
+  height: 34px;
+  opacity: 0.82;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.icon-rail-btn:hover img {
+  opacity: 1;
+  filter: drop-shadow(0 0 3px rgba(201, 168, 118, 0.5));
 }
 
 .icon-rail-btn:hover {
@@ -153,7 +190,7 @@ body {
   justify-content: space-between;
   gap: 16px;
   padding: 14px 20px;
-  background: linear-gradient(180deg, var(--bg-panel-raised), var(--bg-panel));
+  background: linear-gradient(180deg, var(--bg-panel-raised-translucent), var(--bg-panel-translucent));
   border-bottom: 2px solid var(--border-strong);
   flex-shrink: 0;
   flex-wrap: wrap;
@@ -546,19 +583,23 @@ body {
 .app-layout {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(420px, 3.5fr) minmax(300px, 1.5fr);
+  grid-template-columns: minmax(220px, 1fr) minmax(420px, 3.5fr) minmax(284px, 1.5fr);
   gap: 1px;
   overflow: hidden;
-  background: var(--border-soft);
+  background: var(--border-soft-translucent);
 }
 
 .panel {
-  background: var(--bg-panel);
+  background: var(--bg-panel-translucent);
   padding: 14px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.panel-right {
+  min-width: 284px;
 }
 
 .left-column {
@@ -567,7 +608,7 @@ body {
   min-height: 0;
   overflow: hidden;
   gap: 1px;
-  background: var(--border-soft);
+  background: var(--border-soft-translucent);
 }
 
 .left-column .panel-left {
@@ -713,7 +754,7 @@ body {
 }
 
 .monster-row {
-  background: var(--bg-panel-raised);
+  background: var(--bg-panel-raised-translucent);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
   padding: 8px 10px;
@@ -848,7 +889,7 @@ body {
   grid-template-columns: 24px 44px 52px 1fr 40px 130px 1.4fr 90px;
   align-items: center;
   gap: 10px;
-  background: var(--bg-panel-raised);
+  background: var(--bg-panel-raised-translucent);
   border: 1px solid var(--border-soft);
   border-left: 3px solid transparent;
   border-radius: var(--radius-md);
@@ -1183,48 +1224,64 @@ body {
   color: var(--text-muted);
 }
 
-/* AC rendered as an outlined shield shape via clip-path, gold-rimmed,
-   matching the visualization's shield-with-number-inside treatment
-   (rather than a plain number or a generic rounded box). */
-.detail-stat-shield {
-  width: 34px;
-  height: 38px;
-  background: var(--bg-ink);
-  border: 2px solid var(--gold-dim);
-  clip-path: polygon(50% 0%, 100% 15%, 100% 60%, 50% 100%, 0% 60%, 0% 15%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Each stat (AC/HP/Init) is rendered as a value centered over a themed
+   PNG badge (shield/heart/compass respectively) rather than a plain box
+   or CSS clip-path shape -- replaces the earlier shield-via-clip-path
+   approach now that real artwork is available for all three stats. */
+.detail-stat-icon {
+  position: relative;
+  width: 123px;
+  height: 48px;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
   font-family: var(--font-mono);
   font-weight: 700;
   font-size: 0.95rem;
   color: var(--text-parchment);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-.detail-stat-value {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--text-parchment);
-  background: var(--bg-ink);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  padding: 4px 10px;
-  min-width: 34px;
-  text-align: center;
+/* Positions the value text at the plate's actual center (measured at
+   ~64% of the image's width from the source PNG's badge+plate layout),
+   not the whole element's center -- centering on the full box would
+   push text half onto the circular badge instead. Using absolute
+   positioning + translateX(-50%) (rather than padding + translate on
+   the flex container) keeps the text correctly centered on that exact
+   point regardless of how long the value text is (short "15" vs.
+   longer "23/44" both center identically). */
+.detail-stat-icon-value {
+  position: absolute;
+  left: 64.2%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
 }
 
-/* HP box color escalates with how low current HP is, mirroring the
-   same thresholds used for the turn-row HP bar fill elsewhere. */
-.detail-stat-value.detail-hp-mid {
+.detail-stat-icon-ac {
+  background-image: url('assets/icons/stat-ac.png');
+}
+
+.detail-stat-icon-hp {
+  background-image: url('assets/icons/stat-hp.png');
+}
+
+.detail-stat-icon-init {
+  background-image: url('assets/icons/stat-init.png');
+}
+
+/* HP value color escalates with how low current HP is, mirroring the
+   same thresholds used for the turn-row HP bar fill elsewhere. The
+   artwork itself doesn't change (a colored border/background like the
+   old plain box had would clash with the ornate frame art) -- urgency
+   is conveyed by the number's own color and glow instead. */
+.detail-stat-icon-hp.detail-hp-mid {
   color: var(--gold);
-  border-color: var(--gold-dim);
 }
 
-.detail-stat-value.detail-hp-low {
-  color: var(--red-blood);
-  border-color: var(--red-blood-dim);
-  background: rgba(168, 68, 68, 0.1);
+.detail-stat-icon-hp.detail-hp-low {
+  color: #ff8888;
+  text-shadow: 0 0 6px rgba(255, 0, 0, 0.6), 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
 .detail-name {
@@ -1651,7 +1708,7 @@ body {
   border: 1px solid var(--gold-dim);
   border-radius: var(--radius-md);
   overflow: hidden;
-  background: var(--bg-panel-raised);
+  background: var(--bg-panel-raised-translucent);
 }
 
 .accordion-section + .accordion-section {

@@ -345,14 +345,49 @@ const UI = (() => {
         <div class="monster-row-second-line">
           <span class="monster-row-meta">${escapeHtml(tpl.type)} &middot; CR ${escapeHtml(tpl.challengeRating)} &middot; ${escapeHtml(tpl.source)}</span>
           <div class="monster-row-actions">
-            <input type="number" class="qty-input" value="1" min="1" max="20" aria-label="Počet kusů" />
+            <div class="qty-stepper">
+              <button class="qty-stepper-btn qty-stepper-minus" type="button" aria-label="Snížit počet kusů">&minus;</button>
+              <input type="number" class="qty-input" value="1" min="1" max="20" aria-label="Počet kusů" />
+              <button class="qty-stepper-btn qty-stepper-plus" type="button" aria-label="Zvýšit počet kusů">+</button>
+            </div>
             <button class="btn btn-add" type="button">Přidat</button>
           </div>
         </div>
       `;
       const qtyInput = row.querySelector('.qty-input');
+      const minusBtn = row.querySelector('.qty-stepper-minus');
+      const plusBtn = row.querySelector('.qty-stepper-plus');
       const addBtn = row.querySelector('.btn-add');
       const infoBtn = row.querySelector('.statblock-info-btn');
+
+      const QTY_MIN = parseInt(qtyInput.min, 10);
+      const QTY_MAX = parseInt(qtyInput.max, 10);
+
+      /** Keeps the qty input's value clamped to [QTY_MIN, QTY_MAX] and
+       *  disables whichever stepper button is at its limit, so clicking
+       *  it again visibly does nothing rather than silently failing. */
+      function updateStepperState() {
+        let n = parseInt(qtyInput.value, 10);
+        if (!Number.isFinite(n)) n = QTY_MIN;
+        n = Math.min(QTY_MAX, Math.max(QTY_MIN, n));
+        qtyInput.value = n;
+        minusBtn.disabled = n <= QTY_MIN;
+        plusBtn.disabled = n >= QTY_MAX;
+      }
+      updateStepperState(); // set the correct initial disabled state at the default value of 1
+
+      minusBtn.addEventListener('click', () => {
+        qtyInput.value = Math.max(QTY_MIN, (parseInt(qtyInput.value, 10) || QTY_MIN) - 1);
+        updateStepperState();
+      });
+
+      plusBtn.addEventListener('click', () => {
+        qtyInput.value = Math.min(QTY_MAX, (parseInt(qtyInput.value, 10) || QTY_MIN) + 1);
+        updateStepperState();
+      });
+
+      qtyInput.addEventListener('input', updateStepperState);
+      qtyInput.addEventListener('blur', updateStepperState);
 
       infoBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -807,38 +842,85 @@ const UI = (() => {
    *  around it, once real artwork exists), name+source badge+DEAD tag,
    *  an AC "shield" stat, HP (colored red when low), and the editable
    *  Initiative field. Matches the visualization's header layout. */
+  // The 14 standard D&D 5e creature types, each with its own themed icon
+  // (assets/icons/monster-types/type-<name>.png). Used instead of a
+  // unique icon per monster (hundreds of distinct stat blocks would be
+  // impractical to source individual artwork for) -- one icon per broad
+  // category covers every monster in the bestiary.
+  const MONSTER_TYPE_ICONS = new Set([
+    'aberration', 'beast', 'celestial', 'construct', 'dragon', 'elemental',
+    'fey', 'fiend', 'giant', 'humanoid', 'monstrosity', 'ooze', 'plant', 'undead',
+  ]);
+
+  /** Extracts a monster's base creature type from its raw type string
+   *  (e.g. "humanoid (orc)" -> "humanoid", "undead (shapechanger)" ->
+   *  "undead", "monstrosity (shapechanger, yuan-ti)" -> "monstrosity")
+   *  and maps it to the corresponding icon path. Returns null if the
+   *  type is missing or doesn't match one of the 14 known categories,
+   *  so callers can fall back to the generic emoji portrait. */
+  function getMonsterTypeIconUrl(typeString) {
+    if (!typeString) return null;
+    const baseType = typeString.split('(')[0].trim().toLowerCase();
+    if (!MONSTER_TYPE_ICONS.has(baseType)) return null;
+    return `assets/icons/monster-types/type-${baseType}.png`;
+  }
+
+  // The 13 standard D&D 5e classes, each with its own themed icon
+  // (assets/icons/classes/class-<name>.png).
+  const PLAYER_CLASS_ICONS = new Set([
+    'artificer', 'barbarian', 'bard', 'cleric', 'druid', 'fighter', 'monk',
+    'paladin', 'ranger', 'rogue', 'sorcerer', 'warlock', 'wizard',
+  ]);
+
+  /** Maps a player's className (free text in the player editor, so it
+   *  could be anything -- a typo, a different language, a homebrew
+   *  class) to one of the 13 known class icons via a case-insensitive
+   *  exact match. Returns null when there's no match, so callers can
+   *  fall back to the generic shield emoji portrait. */
+  function getPlayerClassIconUrl(className) {
+    if (!className) return null;
+    const normalized = className.trim().toLowerCase();
+    if (!PLAYER_CLASS_ICONS.has(normalized)) return null;
+    return `assets/icons/classes/class-${normalized}.png`;
+  }
+
   function renderDetailHeader(inst, subtitle) {
     const isPlayer = inst.sourceType === 'player';
     const badgeClass = isPlayer ? 'source-badge source-badge-pc' : 'source-badge source-badge-mon';
     const badgeText = isPlayer ? 'PC' : 'MON';
-    const portraitIcon = isPlayer ? '🛡️' : '👹';
     const canReroll = inst.initiativeMode === 'auto';
 
-    const hpPct = inst.maxHp > 0 ? Math.max(0, Math.min(100, (inst.currentHp / inst.maxHp) * 100)) : 0;
-    const hpColorClass = hpPct <= 25 ? 'detail-hp-low' : hpPct <= 50 ? 'detail-hp-mid' : '';
+    // Monsters get a type-based icon (humanoid/undead/dragon/etc.) when
+    // their library template's type matches one of the 14 known
+    // categories; players get a class-based icon (fighter/wizard/etc.)
+    // under the same matching logic. Either falls back to a generic
+    // emoji portrait when there's no match (unknown/missing type or
+    // class, or a homebrew value that doesn't correspond to artwork).
+    let portraitHtml;
+    if (isPlayer) {
+      const tpl = PlayerLibrary.getById(inst.templateId);
+      const iconUrl = tpl ? getPlayerClassIconUrl(tpl.className) : null;
+      portraitHtml = iconUrl
+        ? `<img src="${iconUrl}" alt="${tpl.className}" />`
+        : '<span class="detail-portrait-emoji">🛡️</span>';
+    } else {
+      const tpl = MonsterLibrary.getById(inst.templateId);
+      const iconUrl = tpl ? getMonsterTypeIconUrl(tpl.type) : null;
+      portraitHtml = iconUrl
+        ? `<img src="${iconUrl}" alt="${tpl.type}" />`
+        : '<span class="detail-portrait-emoji">👹</span>';
+    }
 
     return `
       <div class="detail-header-v2">
-        <div class="detail-portrait">${portraitIcon}</div>
-        <div class="detail-header-main">
-          <h2 class="detail-name">
-            <span class="${badgeClass}">${badgeText}</span>
-            ${escapeHtml(inst.publicName || inst.displayName)}${inst.isDead ? ' <span class="dead-tag">DEAD</span>' : ''}
-          </h2>
-          <div class="detail-sub">${subtitle}</div>
-        </div>
-        <div class="detail-header-stats">
-          <div class="detail-stat-block">
-            <div class="detail-stat-label">AC</div>
-            <div class="detail-stat-icon detail-stat-icon-ac"><span class="detail-stat-icon-value">${inst.armorClass}</span></div>
-          </div>
-          <div class="detail-stat-block">
-            <div class="detail-stat-label">HP</div>
-            <div class="detail-stat-icon detail-stat-icon-hp ${hpColorClass}"><span class="detail-stat-icon-value">${inst.currentHp}/${inst.maxHp}</span></div>
-          </div>
-          <div class="detail-stat-block">
-            <div class="detail-stat-label">Init</div>
-            <div class="detail-stat-icon detail-stat-icon-init"><span class="detail-stat-icon-value">${inst.initiative === null ? '–' : inst.initiative}</span></div>
+        <div class="detail-header-top">
+          <div class="detail-portrait">${portraitHtml}</div>
+          <div class="detail-header-main">
+            <h2 class="detail-name">
+              <span class="${badgeClass}">${badgeText}</span>
+              ${escapeHtml(inst.publicName || inst.displayName)}${inst.isDead ? ' <span class="dead-tag">DEAD</span>' : ''}
+            </h2>
+            <div class="detail-sub">${subtitle}</div>
           </div>
         </div>
       </div>
@@ -846,12 +928,20 @@ const UI = (() => {
       <div class="detail-stats">
         <div class="stat-box">
           <label for="detail-ac">AC</label>
-          <input id="detail-ac" type="number" value="${inst.armorClass}" />
+          <div class="qty-stepper">
+            <button class="qty-stepper-btn" type="button" data-stepper-target="detail-ac" data-stepper-delta="-1" aria-label="Snížit AC">&minus;</button>
+            <input id="detail-ac" class="qty-input" type="number" value="${inst.armorClass}" />
+            <button class="qty-stepper-btn" type="button" data-stepper-target="detail-ac" data-stepper-delta="1" aria-label="Zvýšit AC">+</button>
+          </div>
         </div>
         <div class="stat-box">
           <label for="detail-init">Iniciativa</label>
           <div class="init-input-row">
-            <input id="detail-init" type="number" value="${inst.initiative === null ? '' : inst.initiative}" placeholder="–" />
+            <div class="qty-stepper">
+              <button class="qty-stepper-btn" type="button" data-stepper-target="detail-init" data-stepper-delta="-1" aria-label="Snížit iniciativu">&minus;</button>
+              <input id="detail-init" class="qty-input" type="number" value="${inst.initiative === null ? '' : inst.initiative}" placeholder="–" />
+              <button class="qty-stepper-btn" type="button" data-stepper-target="detail-init" data-stepper-delta="1" aria-label="Zvýšit iniciativu">+</button>
+            </div>
             ${canReroll
               ? '<button id="reroll-init-btn" class="btn btn-small" type="button" title="Hodit znovu d20 + bonus">🎲</button>'
               : '<span class="manual-init-tag" title="Hráčská iniciativa se zadává ručně, nikdy se nepřehazuje automaticky">ruční</span>'}
@@ -894,15 +984,27 @@ const UI = (() => {
         <div class="hp-quick-row">
           <div class="hp-quick-field">
             <label for="hp-minus-input">- Zranění</label>
-            <input type="number" id="hp-minus-input" class="hp-quick-input-num" min="0" placeholder="0" inputmode="numeric" />
+            <div class="qty-stepper">
+              <button class="qty-stepper-btn" type="button" data-stepper-target="hp-minus-input" data-stepper-delta="-1" data-stepper-min="0" aria-label="Snížit zadané zranění">&minus;</button>
+              <input type="number" id="hp-minus-input" class="hp-quick-input-num qty-input" min="0" placeholder="0" inputmode="numeric" />
+              <button class="qty-stepper-btn" type="button" data-stepper-target="hp-minus-input" data-stepper-delta="1" data-stepper-min="0" aria-label="Zvýšit zadané zranění">+</button>
+            </div>
           </div>
           <div class="hp-quick-field">
             <label for="hp-plus-input">+ Léčení</label>
-            <input type="number" id="hp-plus-input" class="hp-quick-input-num" min="0" placeholder="0" inputmode="numeric" />
+            <div class="qty-stepper">
+              <button class="qty-stepper-btn" type="button" data-stepper-target="hp-plus-input" data-stepper-delta="-1" data-stepper-min="0" aria-label="Snížit zadané léčení">&minus;</button>
+              <input type="number" id="hp-plus-input" class="hp-quick-input-num qty-input" min="0" placeholder="0" inputmode="numeric" />
+              <button class="qty-stepper-btn" type="button" data-stepper-target="hp-plus-input" data-stepper-delta="1" data-stepper-min="0" aria-label="Zvýšit zadané léčení">+</button>
+            </div>
           </div>
           <div class="hp-quick-field">
             <label for="hp-set-input">= Nastavit HP</label>
-            <input type="number" id="hp-set-input" class="hp-quick-input-num" placeholder="HP" inputmode="numeric" />
+            <div class="qty-stepper">
+              <button class="qty-stepper-btn" type="button" data-stepper-target="hp-set-input" data-stepper-delta="-1" aria-label="Snížit zadané HP">&minus;</button>
+              <input type="number" id="hp-set-input" class="hp-quick-input-num qty-input" placeholder="HP" inputmode="numeric" />
+              <button class="qty-stepper-btn" type="button" data-stepper-target="hp-set-input" data-stepper-delta="1" aria-label="Zvýšit zadané HP">+</button>
+            </div>
           </div>
         </div>
         <div class="hp-quick-hint">Enter v poli potvrdí změnu</div>
@@ -1114,23 +1216,66 @@ const UI = (() => {
     const name = inst.publicName || inst.displayName;
 
     const acInput = document.getElementById('detail-ac');
-    acInput.addEventListener('change', () => {
+    function commitAc() {
       const newAc = parseInt(acInput.value, 10) || 0;
       const oldAc = inst.armorClass;
       if (newAc === oldAc) return;
       mutate(`${name} AC changed from ${oldAc} to ${newAc}`, () => {
         inst.armorClass = newAc;
       });
-    });
+    }
+    acInput.addEventListener('change', commitAc);
 
     const initInput = document.getElementById('detail-init');
-    initInput.addEventListener('change', () => {
+    function commitInit() {
       const raw = initInput.value.trim();
       const value = raw === '' ? null : parseInt(raw, 10);
       mutate(
         value === null ? `${name} initiative cleared` : `${name} initiative set to ${value}`,
         () => Encounter.setInitiative(inst.instanceId, value)
       );
+    }
+    initInput.addEventListener('change', commitInit);
+
+    // +/- stepper buttons for AC and Init (step of 1, per the agreed
+    // behavior). A single shared handler reads which input to adjust
+    // from data-stepper-target/data-stepper-delta rather than wiring
+    // four near-identical listeners. An empty Init field is treated as
+    // 0 for the purpose of the first click (0 + 1 = 1, 0 - 1 = -1)
+    // rather than the click doing nothing until a value exists.
+    document.querySelectorAll('.detail-stats .qty-stepper-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.dataset.stepperTarget;
+        const delta = parseInt(btn.dataset.stepperDelta, 10);
+        const targetInput = document.getElementById(targetId);
+        const current = parseInt(targetInput.value, 10);
+        targetInput.value = (Number.isFinite(current) ? current : 0) + delta;
+        if (targetId === 'detail-ac') {
+          commitAc();
+        } else if (targetId === 'detail-init') {
+          commitInit();
+        }
+      });
+    });
+
+    // HP quick-entry field steppers (Zranění/Léčení/Nastavit HP) --
+    // these only adjust the typed-in value, never auto-commit. Enter
+    // (wired elsewhere, unchanged) is still what actually applies the
+    // change and clears the field afterward, exactly as typing the
+    // number by hand already did.
+    document.querySelectorAll('.hp-quick-row .qty-stepper-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.dataset.stepperTarget;
+        const delta = parseInt(btn.dataset.stepperDelta, 10);
+        const minAttr = btn.dataset.stepperMin;
+        const targetInput = document.getElementById(targetId);
+        const current = parseInt(targetInput.value, 10);
+        let next = (Number.isFinite(current) ? current : 0) + delta;
+        if (minAttr !== undefined) {
+          next = Math.max(parseInt(minAttr, 10), next);
+        }
+        targetInput.value = next;
+      });
     });
 
     // Re-roll button only exists for initiativeMode === "auto" (monsters);

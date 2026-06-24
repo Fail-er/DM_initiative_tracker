@@ -106,6 +106,45 @@ body {
   background-repeat: repeat;
 }
 
+/* =========================================================================
+   Scrollbars -- themed globally so every scrollable panel/list/popover in
+   the app shares the same dark-track, gold-thumb look instead of the
+   browser's default white/gray scrollbar, which stood out harshly
+   against the app's dark palette.
+   ========================================================================= */
+
+/* Firefox: the two standard properties it supports for this. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-dim) var(--bg-ink);
+}
+
+/* Chrome/Edge/Safari: the ::-webkit-scrollbar pseudo-elements, which
+   allow more detailed styling (track/thumb colors, rounded corners,
+   hover state) than Firefox's two-property shorthand above. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-ink);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gold-dim);
+  border-radius: 6px;
+  border: 2px solid var(--bg-ink);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--bg-ink);
+}
+
 .app-main-column {
   flex: 1;
   display: flex;
@@ -248,12 +287,18 @@ body {
 
 .spellbook-search-icon {
   position: absolute;
-  left: 9px;
+  left: 8px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--gold-dim);
-  font-size: 0.78rem;
   pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.spellbook-search-icon img {
+  width: 16px;
+  height: 16px;
+  opacity: 0.85;
 }
 
 .spellbook-search-clear-btn {
@@ -614,6 +659,16 @@ body {
 .left-column .panel-left {
   flex: 1;
   min-height: 0;
+  /* Scrollbar sits closer to the panel's outer edge (away from window
+     content) rather than right against the card content -- the content
+     containers below get extra right padding to compensate, so cards
+     stay visually where they were, just with more breathing room
+     before the scrollbar starts. */
+  padding-right: 4px;
+}
+
+.left-column .panel-left .monster-results {
+  padding-right: 10px;
 }
 
 .left-column .panel-reminders {
@@ -814,15 +869,92 @@ body {
 }
 
 .qty-input {
-  width: 42px;
+  width: 52px;
   background: var(--bg-ink);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   color: var(--text-parchment);
-  padding: 5px;
-  font-size: 0.8rem;
+  padding: 8px 4px;
+  font-size: 0.95rem;
   text-align: center;
   font-family: var(--font-mono);
+}
+
+/* Hide the browser's default number-input spin arrows everywhere --
+   the monster-count field gets custom +/- buttons instead (see
+   .qty-stepper below), and the player-initiative field intentionally
+   has no increment/decrement controls at all (a DM types a specific
+   rolled value, not something to step through). */
+.qty-input::-webkit-outer-spin-button,
+.qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.qty-input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+/* Custom stepper wrapping a qty-input: minus button, the input itself,
+   plus button -- replacing the browser's default spin arrows (which
+   can't be recolored/restyled to match the app's theme) with fully
+   themed controls, same treatment as the scrollbar restyling earlier. */
+.qty-stepper {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.qty-stepper .qty-input {
+  width: 36px;
+  border: none;
+  border-radius: 0;
+  padding: 8px 2px;
+}
+
+/* AC/Init values can be wider than the monster-count field's 1-20 range
+   (negative numbers, two-digit AC) -- give their steppers' input a bit
+   more room than the base 36px. */
+.detail-stats .qty-stepper .qty-input {
+  width: 32px;
+  font-size: 0.95rem;
+}
+
+.detail-stats .qty-stepper-btn {
+  width: 20px;
+  font-size: 0.85rem;
+}
+
+.qty-stepper-btn {
+  width: 26px;
+  background: var(--bg-panel-raised);
+  border: none;
+  color: var(--gold-dim);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.qty-stepper-btn:hover {
+  background: var(--border-soft);
+  color: var(--gold);
+}
+
+.qty-stepper-btn:active {
+  background: var(--gold-dim);
+  color: var(--bg-ink);
+}
+
+.qty-stepper-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .import-status {
@@ -863,7 +995,7 @@ body {
 
 .turn-list-header {
   display: grid;
-  grid-template-columns: 24px 44px 52px 1fr 40px 130px 1.4fr 90px;
+  grid-template-columns: 24px 44px 52px 1.4fr 40px 130px 1fr 90px;
   gap: 10px;
   padding: 0 10px 6px 10px;
   font-size: 0.68rem;
@@ -886,7 +1018,7 @@ body {
 
 .turn-row {
   display: grid;
-  grid-template-columns: 24px 44px 52px 1fr 40px 130px 1.4fr 90px;
+  grid-template-columns: 24px 44px 52px 1.4fr 40px 130px 1fr 90px;
   align-items: center;
   gap: 10px;
   background: var(--bg-panel-raised-translucent);
@@ -1179,109 +1311,43 @@ body {
 
 .detail-header-v2 {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border-soft);
 }
 
+.detail-header-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .detail-portrait {
   flex-shrink: 0;
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background: var(--bg-panel);
-  border: 2px solid var(--gold-dim);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
   overflow: hidden;
+}
+
+.detail-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.detail-portrait-emoji {
+  font-size: 1.5rem;
 }
 
 .detail-header-main {
   flex: 1;
   min-width: 0;
-}
-
-.detail-header-stats {
-  display: flex;
-  gap: 14px;
-  flex-shrink: 0;
-}
-
-.detail-stat-block {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-}
-
-.detail-stat-label {
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-
-/* Each stat (AC/HP/Init) is rendered as a value centered over a themed
-   PNG badge (shield/heart/compass respectively) rather than a plain box
-   or CSS clip-path shape -- replaces the earlier shield-via-clip-path
-   approach now that real artwork is available for all three stats. */
-.detail-stat-icon {
-  position: relative;
-  width: 123px;
-  height: 48px;
-  background-size: contain;
-  background-position: center;
-  background-repeat: no-repeat;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: var(--text-parchment);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-/* Positions the value text at the plate's actual center (measured at
-   ~64% of the image's width from the source PNG's badge+plate layout),
-   not the whole element's center -- centering on the full box would
-   push text half onto the circular badge instead. Using absolute
-   positioning + translateX(-50%) (rather than padding + translate on
-   the flex container) keeps the text correctly centered on that exact
-   point regardless of how long the value text is (short "15" vs.
-   longer "23/44" both center identically). */
-.detail-stat-icon-value {
-  position: absolute;
-  left: 64.2%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  white-space: nowrap;
-}
-
-.detail-stat-icon-ac {
-  background-image: url('assets/icons/stat-ac.png');
-}
-
-.detail-stat-icon-hp {
-  background-image: url('assets/icons/stat-hp.png');
-}
-
-.detail-stat-icon-init {
-  background-image: url('assets/icons/stat-init.png');
-}
-
-/* HP value color escalates with how low current HP is, mirroring the
-   same thresholds used for the turn-row HP bar fill elsewhere. The
-   artwork itself doesn't change (a colored border/background like the
-   old plain box had would clash with the ornate frame art) -- urgency
-   is conveyed by the number's own color and glow instead. */
-.detail-stat-icon-hp.detail-hp-mid {
-  color: var(--gold);
-}
-
-.detail-stat-icon-hp.detail-hp-low {
-  color: #ff8888;
-  text-shadow: 0 0 6px rgba(255, 0, 0, 0.6), 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
 .detail-name {
@@ -1308,14 +1374,19 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 6px;
+  background: var(--bg-panel-raised-translucent);
+  border: 1px solid var(--gold-dim);
+  border-radius: var(--radius-md);
+  padding: 8px 8px;
 }
 
 .stat-box label {
-  font-size: 0.68rem;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  color: var(--gold);
 }
 
 .stat-box input {
@@ -1324,9 +1395,35 @@ body {
   border-radius: var(--radius-sm);
   color: var(--text-parchment);
   font-family: var(--font-mono);
-  font-size: 1rem;
-  padding: 6px;
+  font-weight: 700;
+  font-size: 1.15rem;
+  text-align: center;
+  padding: 7px 6px;
   width: 100%;
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.5);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.stat-box input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(201, 168, 118, 0.25);
+}
+
+/* Inside a qty-stepper, the input gives up its own border/radius/width
+   in favor of the stepper's shared treatment (flex-1 to fill the space
+   between the two buttons, no border of its own since the stepper's
+   outer border already wraps the whole group) -- same pattern as the
+   HP quick-entry fields. */
+.stat-box .qty-stepper .qty-input {
+  width: auto;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.stat-box .qty-stepper .qty-input:focus {
+  box-shadow: none;
 }
 
 .init-input-row {
@@ -1340,7 +1437,7 @@ body {
 
 .init-input-row .btn {
   flex-shrink: 0;
-  padding: 6px 9px;
+  padding: 6px 7px;
 }
 
 .detail-hp-block {
@@ -1379,8 +1476,22 @@ body {
 
 .hp-quick-row {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   margin-top: 6px;
+}
+
+/* Three steppers side by side need to be narrower than the AC/Init
+   ones (which only share space two at a time) to avoid overflowing
+   the panel's width, especially at its minimum size. */
+.hp-quick-row .qty-stepper .qty-input {
+  width: 28px;
+  font-size: 0.8rem;
+  padding: 7px 1px;
+}
+
+.hp-quick-row .qty-stepper-btn {
+  width: 20px;
+  font-size: 0.85rem;
 }
 
 .hp-quick-field {
@@ -1408,6 +1519,18 @@ body {
   padding: 7px 4px;
   font-size: 0.85rem;
   text-align: center;
+}
+
+/* Inside a qty-stepper, the input gives up its own border/radius/width
+   in favor of the stepper's shared treatment (flex-1 to fill the space
+   between the two buttons, no border of its own since the stepper's
+   outer border already wraps the whole group) -- same pattern as the
+   AC/Init steppers. */
+.qty-stepper .hp-quick-input-num {
+  width: auto;
+  flex: 1;
+  border: none;
+  border-radius: 0;
 }
 
 .hp-quick-input-num:focus-visible {
@@ -1480,6 +1603,15 @@ body {
   gap: 2px;
   margin-bottom: 10px;
   border-bottom: 1px solid var(--border-soft);
+}
+
+.left-column .panel-left .library-tabs {
+  padding-right: 10px;
+}
+
+.left-column .panel-left > .panel-header,
+.left-column .panel-left .library-tab-content > .panel-header {
+  padding-right: 10px;
 }
 
 .library-tab {
@@ -1614,7 +1746,7 @@ body {
   color: var(--steel-blue);
   border: 1px solid var(--steel-blue-dim);
   border-radius: var(--radius-sm);
-  padding: 6px 8px;
+  padding: 6px 6px;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -1801,6 +1933,7 @@ body {
 
 .panel-reminders {
   overflow: hidden;
+  padding-right: 4px;
 }
 
 .panel-reminders-header {
@@ -1809,6 +1942,7 @@ body {
   gap: 10px;
   margin-bottom: 8px;
   flex-shrink: 0;
+  padding-right: 10px;
 }
 
 .panel-reminders-header h2 {
@@ -1820,6 +1954,7 @@ body {
   flex-direction: column;
   gap: 6px;
   overflow-y: auto;
+  padding-right: 10px;
 }
 
 .reminder-item {

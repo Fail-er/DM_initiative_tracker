@@ -3,7 +3,7 @@
     {
       "id": "zapal",
       "name": "Zápal",
-      "className": "Barbar",
+      "className": "Barbarian",
       "level": 5,
       "armorClass": 15,
       "maxHp": 44,
@@ -27,7 +27,7 @@
     {
       "id": "aeris",
       "name": "Aeris",
-      "className": "Klerik",
+      "className": "Cleric",
       "level": 5,
       "armorClass": 16,
       "maxHp": 31,
@@ -51,7 +51,7 @@
     {
       "id": "gimble",
       "name": "Gimble",
-      "className": "Hobit Zloděj",
+      "className": "Rogue",
       "level": 5,
       "armorClass": 14,
       "maxHp": 28,

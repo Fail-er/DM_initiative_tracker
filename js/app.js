@@ -148,7 +148,7 @@ const INLINE_SAMPLE_MONSTERS = {
 const INLINE_SAMPLE_PLAYERS = {
   players: [
     {
-      id: 'zapal', name: 'Zápal', className: 'Barbar', level: 5,
+      id: 'zapal', name: 'Zápal', className: 'Barbarian', level: 5,
       armorClass: 15, maxHp: 44, currentHp: 44, tempHp: 0, initiativeBonus: 2, speed: '40 ft.',
       abilities: { str: 18, dex: 14, con: 16, int: 8, wis: 10, cha: 8 },
       savingThrows: { str: 7, dex: 5, con: 6, int: -1, wis: 0, cha: -1 },
@@ -161,7 +161,7 @@ const INLINE_SAMPLE_PLAYERS = {
       ],
     },
     {
-      id: 'aeris', name: 'Aeris', className: 'Klerik', level: 5,
+      id: 'aeris', name: 'Aeris', className: 'Cleric', level: 5,
       armorClass: 16, maxHp: 31, currentHp: 31, tempHp: 0, initiativeBonus: 0, speed: '30 ft.',
       abilities: { str: 10, dex: 10, con: 14, int: 12, wis: 17, cha: 12 },
       savingThrows: { str: 0, dex: 0, con: 2, int: 1, wis: 6, cha: 1 },
@@ -174,7 +174,7 @@ const INLINE_SAMPLE_PLAYERS = {
       ],
     },
     {
-      id: 'gimble', name: 'Gimble', className: 'Hobit Zloděj', level: 5,
+      id: 'gimble', name: 'Gimble', className: 'Rogue', level: 5,
       armorClass: 14, maxHp: 28, currentHp: 28, tempHp: 0, initiativeBonus: 4, speed: '25 ft.',
       abilities: { str: 8, dex: 18, con: 12, int: 13, wis: 12, cha: 14 },
       savingThrows: { str: -1, dex: 7, con: 1, int: 1, wis: 1, cha: 2 },

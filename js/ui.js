@@ -340,7 +340,7 @@ const UI = (() => {
       row.innerHTML = `
         <span class="monster-row-name">
           <span class="monster-row-name-text">${escapeHtml(tpl.name)}</span>
-          <button class="statblock-info-btn" type="button" title="Stat block" aria-label="Zobrazit stat block">ⓘ</button>
+          <button class="statblock-info-btn" type="button" title="Stat block" aria-label="Zobrazit stat block"><img src="assets/icons/icon-statblock.png" alt="" /></button>
         </span>
         <div class="monster-row-second-line">
           <span class="monster-row-meta">${escapeHtml(tpl.type)} &middot; CR ${escapeHtml(tpl.challengeRating)} &middot; ${escapeHtml(tpl.source)}</span>
@@ -476,7 +476,7 @@ const UI = (() => {
       row.innerHTML = `
         <span class="monster-row-name">
           <span class="monster-row-name-text">${escapeHtml(p.name)}</span>
-          <button class="statblock-info-btn" type="button" title="Stat block" aria-label="Zobrazit stat block">ⓘ</button>
+          <button class="statblock-info-btn" type="button" title="Stat block" aria-label="Zobrazit stat block"><img src="assets/icons/icon-statblock.png" alt="" /></button>
         </span>
         <div class="monster-row-second-line">
           <span class="monster-row-meta">${escapeHtml(p.className)} ${p.level} &middot; AC ${p.armorClass} &middot; HP ${p.currentHp}/${p.maxHp}</span>
@@ -626,7 +626,7 @@ const UI = (() => {
       const badgeText = isPlayer ? 'PC' : 'MON';
 
       const anonymizeBtnHtml = !isPlayer
-        ? `<button class="anonymize-toggle-btn${inst.isAnonymized ? ' anonymize-toggle-btn-active' : ''}" type="button" data-instance-id="${inst.instanceId}" title="${inst.isAnonymized ? 'Zobrazit skutečné jméno v Player View' : 'Skrýt jméno v Player View (zobrazí se jako Nepřítel N)'}" aria-label="Přepnout anonymizaci v Player View">🎭</button>`
+        ? `<button class="anonymize-toggle-btn${inst.isAnonymized ? ' anonymize-toggle-btn-active' : ''}" type="button" data-instance-id="${inst.instanceId}" title="${inst.isAnonymized ? 'Zobrazit skutečné jméno v Player View' : 'Skrýt jméno v Player View (zobrazí se jako Nepřítel N)'}" aria-label="Přepnout anonymizaci v Player View"><img src="assets/icons/icon-anonymize.png" alt="" /></button>`
         : '';
 
       row.innerHTML = `
@@ -652,8 +652,8 @@ const UI = (() => {
         </div>
         <div class="turn-row-actions">
           ${anonymizeBtnHtml}
-          <button class="statblock-info-btn" type="button" data-instance-id="${inst.instanceId}" title="Stat block" aria-label="Zobrazit stat block">ⓘ</button>
-          <button class="remove-instance-btn" type="button" data-instance-id="${inst.instanceId}" title="Odstranit z encounteru (Delete)" aria-label="Odstranit z encounteru">🗑</button>
+          <button class="statblock-info-btn" type="button" data-instance-id="${inst.instanceId}" title="Stat block" aria-label="Zobrazit stat block"><img src="assets/icons/icon-statblock.png" alt="" /></button>
+          <button class="remove-instance-btn" type="button" data-instance-id="${inst.instanceId}" title="Odstranit z encounteru (Delete)" aria-label="Odstranit z encounteru"><img src="assets/icons/icon-remove.png" alt="" /></button>
         </div>
       `;
 
@@ -914,34 +914,13 @@ const UI = (() => {
     return `
       <div class="detail-header-v2">
         <div class="detail-header-top">
-<<<<<<< HEAD
           <div class="detail-portrait">${portraitHtml}</div>
-=======
-          <div class="detail-portrait">${portraitIcon}</div>
->>>>>>> 4f85083178f8b115d363926610fb353083943434
           <div class="detail-header-main">
             <h2 class="detail-name">
               <span class="${badgeClass}">${badgeText}</span>
               ${escapeHtml(inst.publicName || inst.displayName)}${inst.isDead ? ' <span class="dead-tag">DEAD</span>' : ''}
             </h2>
             <div class="detail-sub">${subtitle}</div>
-<<<<<<< HEAD
-=======
-          </div>
-        </div>
-        <div class="detail-header-stats">
-          <div class="detail-stat-block">
-            <div class="detail-stat-label">AC</div>
-            <div class="detail-stat-icon detail-stat-icon-ac"><span class="detail-stat-icon-value">${inst.armorClass}</span></div>
-          </div>
-          <div class="detail-stat-block">
-            <div class="detail-stat-label">HP</div>
-            <div class="detail-stat-icon detail-stat-icon-hp ${hpColorClass}"><span class="detail-stat-icon-value">${inst.currentHp}/${inst.maxHp}</span></div>
-          </div>
-          <div class="detail-stat-block">
-            <div class="detail-stat-label">Init</div>
-            <div class="detail-stat-icon detail-stat-icon-init"><span class="detail-stat-icon-value">${inst.initiative === null ? '–' : inst.initiative}</span></div>
->>>>>>> 4f85083178f8b115d363926610fb353083943434
           </div>
         </div>
       </div>
@@ -964,8 +943,8 @@ const UI = (() => {
               <button class="qty-stepper-btn" type="button" data-stepper-target="detail-init" data-stepper-delta="1" aria-label="Zvýšit iniciativu">+</button>
             </div>
             ${canReroll
-              ? '<button id="reroll-init-btn" class="btn btn-small" type="button" title="Hodit znovu d20 + bonus">🎲</button>'
-              : '<span class="manual-init-tag" title="Hráčská iniciativa se zadává ručně, nikdy se nepřehazuje automaticky">ruční</span>'}
+              ? '<button id="reroll-init-btn" class="btn btn-small btn-icon" type="button" title="Hodit znovu d20 + bonus"><img src="assets/icons/icon-d20.png" alt="" /></button>'
+              : ''}
           </div>
         </div>
       </div>
@@ -999,7 +978,7 @@ const UI = (() => {
         <div class="hp-btn-row">
           <button class="btn hp-btn-wide" id="hp-max-btn">Max</button>
           <button class="btn hp-btn-wide btn-danger" id="hp-dead-btn" title="Klávesa K">Dead</button>
-          <button class="btn hp-btn-wide btn-danger" id="hp-remove-btn" title="Klávesa Delete">🗑 Odstranit</button>
+          <button class="btn hp-btn-wide btn-danger" id="hp-remove-btn" title="Klávesa Delete"><img src="assets/icons/icon-remove.png" alt="" /> Odstranit</button>
         </div>
 
         <div class="hp-quick-row">

@@ -37,7 +37,7 @@
           />
           <button id="spellbook-search-clear-btn" class="spellbook-search-clear-btn" type="button" aria-label="Vymazat vyhledávání" style="display:none">&times;</button>
         </div>
-        <button id="spellbook-import-btn" class="btn btn-small" type="button" title="Import Spells JSON">📥</button>
+        <button id="spellbook-import-btn" class="btn btn-small btn-icon" type="button" title="Import Spells JSON"><img src="assets/icons/icon-import-spells.png" alt="Import Spells" /></button>
         <input id="spellbook-import-input" type="file" accept=".json,application/json" hidden />
       </div>
       <div id="spellbook-results" class="spellbook-results" style="display:none"></div>
@@ -104,7 +104,7 @@
     <section class="panel panel-reminders" aria-label="Připomínky">
       <div class="panel-header panel-reminders-header">
         <h2>Připomínky</h2>
-        <button id="clear-reminders-btn" class="btn btn-small" type="button" title="Smazat všechny připomínky">🗑 Smazat</button>
+        <button id="clear-reminders-btn" class="btn btn-small" type="button" title="Smazat všechny připomínky"><img src="assets/icons/icon-remove.png" alt="" /> Smazat</button>
       </div>
       <div id="reminders-list" class="reminders-list">
         <p class="empty-hint">Žádné připomínky.</p>
@@ -118,14 +118,14 @@
       <div class="panel-header panel-header-encounter">
         <h2 id="round-counter">Kolo 1</h2>
         <div class="encounter-controls">
-          <button id="prev-turn-btn" class="btn" type="button" title="Předchozí tah (B)">&larr; Previous</button>
-          <button id="next-turn-btn" class="btn btn-primary" type="button" title="Posune tah na dalšího v pořadí (N)">Next Turn &rarr;</button>
-          <button id="next-round-btn" class="btn" type="button" title="Skočí na začátek pořadí a zvýší kolo">Next Round &raquo;</button>
+          <button id="prev-turn-btn" class="btn" type="button" title="Předchozí tah (B)"><img src="assets/icons/icon-previous-turn.png" alt="" /> Previous</button>
+          <button id="next-turn-btn" class="btn btn-primary" type="button" title="Posune tah na dalšího v pořadí (N)">Next Turn <img src="assets/icons/icon-next-turn.png" alt="" /></button>
+          <button id="next-round-btn" class="btn" type="button" title="Skočí na začátek pořadí a zvýší kolo">Next Round <img src="assets/icons/icon-next-round.png" alt="" /></button>
         </div>
       </div>
 
       <div class="panel-header panel-header-secondary">
-        <button id="roll-initiative-btn" class="btn btn-small" type="button" title="Hází jen monstrům bez iniciativy. Hráči se nikdy nepřehazují.">🎲 Roll Missing Initiative</button>
+        <button id="roll-initiative-btn" class="btn btn-small" type="button" title="Hází jen monstrům bez iniciativy. Hráči se nikdy nepřehazují."><img src="assets/icons/icon-d20.png" alt="" /> Roll Missing Initiative</button>
         <button id="group-selected-btn" class="btn btn-small" type="button" disabled>Group Selected</button>
         <span id="group-selection-hint" class="group-selection-hint">Vyber 2+ combatanty (checkbox nebo Ctrl/Shift+klik)</span>
         <button id="new-encounter-btn" class="btn btn-small btn-danger" type="button">New Encounter</button>

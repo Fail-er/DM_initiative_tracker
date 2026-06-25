@@ -659,6 +659,7 @@ body {
 .left-column .panel-left {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   /* Scrollbar sits closer to the panel's outer edge (away from window
      content) rather than right against the card content -- the content
      containers below get extra right padding to compensate, so cards
@@ -721,6 +722,29 @@ body {
   transition: background 0.12s ease, border-color 0.12s ease;
 }
 
+/* Small inline icon next to a text label (e.g. #hp-remove-btn,
+   #clear-reminders-btn) -- vertically centered with the text via
+   middle alignment, sized to sit comfortably alongside it rather than
+   dominating the button the way the larger icon-only buttons do. */
+.btn:not(.btn-icon) img {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  margin: 0 2px;
+}
+
+/* Larger icons specifically for the turn-navigation/roll buttons --
+   their existing padding + line-height already provide enough vertical
+   room that a bigger icon (22px vs the generic 16px) still fits inside
+   without growing the button itself. */
+#prev-turn-btn img,
+#next-turn-btn img,
+#next-round-btn img,
+#roll-initiative-btn img {
+  width: 22px;
+  height: 22px;
+}
+
 .btn:hover {
   background: var(--border-soft);
   border-color: var(--gold-dim);
@@ -750,6 +774,21 @@ body {
 .btn-small {
   padding: 5px 9px;
   font-size: 0.75rem;
+}
+
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.btn-icon img {
+  width: 30px;
+  height: 30px;
 }
 
 .btn-primary {
@@ -806,6 +845,7 @@ body {
   flex-direction: column;
   gap: 6px;
   overflow-y: auto;
+  min-width: 0;
 }
 
 .monster-row {
@@ -816,6 +856,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .monster-row-info {
@@ -847,18 +889,18 @@ body {
 
 .monster-row-second-line {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 4px 8px;
+  min-width: 0;
 }
 
 .monster-row-meta {
   font-size: 0.72rem;
   color: var(--text-muted);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .monster-row-actions {
@@ -907,6 +949,16 @@ body {
   overflow: hidden;
 }
 
+.detail-stats .qty-stepper {
+  display: flex;
+  flex: 1;
+}
+
+.detail-stats .init-input-row {
+  flex: 1;
+  min-width: 0;
+}
+
 .qty-stepper .qty-input {
   width: 36px;
   border: none;
@@ -916,9 +968,13 @@ body {
 
 /* AC/Init values can be wider than the monster-count field's 1-20 range
    (negative numbers, two-digit AC) -- give their steppers' input a bit
-   more room than the base 36px. */
+   more room than the base 36px. min-width (not width) so the input can
+   still flex-grow to fill the stat-box's full width once AC/Init wrap
+   onto their own rows, rather than staying pinned at a fixed size with
+   empty space left over inside the wider wrapped box. */
 .detail-stats .qty-stepper .qty-input {
-  width: 32px;
+  flex: 1;
+  min-width: 32px;
   font-size: 0.95rem;
 }
 
@@ -1350,90 +1406,6 @@ body {
   min-width: 0;
 }
 
-<<<<<<< HEAD
-=======
-.detail-header-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.detail-stat-block {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-}
-
-.detail-stat-label {
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-}
-
-/* Each stat (AC/HP/Init) is rendered as a value centered over a themed
-   PNG badge (shield/heart/compass respectively) rather than a plain box
-   or CSS clip-path shape -- replaces the earlier shield-via-clip-path
-   approach now that real artwork is available for all three stats. */
-.detail-stat-icon {
-  position: relative;
-  width: 135px;
-  height: 53px;
-  background-size: contain;
-  background-position: center;
-  background-repeat: no-repeat;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 0.95rem;
-  color: var(--text-parchment);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-/* Positions the value text at the plate's actual center (measured at
-   ~64% of the image's width from the source PNG's badge+plate layout),
-   not the whole element's center -- centering on the full box would
-   push text half onto the circular badge instead. Using absolute
-   positioning + translateX(-50%) (rather than padding + translate on
-   the flex container) keeps the text correctly centered on that exact
-   point regardless of how long the value text is (short "15" vs.
-   longer "23/44" both center identically). */
-.detail-stat-icon-value {
-  position: absolute;
-  left: 64.2%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  white-space: nowrap;
-}
-
-.detail-stat-icon-ac {
-  background-image: url('assets/icons/stat-ac.png');
-}
-
-.detail-stat-icon-hp {
-  background-image: url('assets/icons/stat-hp.png');
-}
-
-.detail-stat-icon-init {
-  background-image: url('assets/icons/stat-init.png');
-}
-
-/* HP value color escalates with how low current HP is, mirroring the
-   same thresholds used for the turn-row HP bar fill elsewhere. The
-   artwork itself doesn't change (a colored border/background like the
-   old plain box had would clash with the ornate frame art) -- urgency
-   is conveyed by the number's own color and glow instead. */
-.detail-stat-icon-hp.detail-hp-mid {
-  color: var(--gold);
-}
-
-.detail-stat-icon-hp.detail-hp-low {
-  color: #ff8888;
-  text-shadow: 0 0 6px rgba(255, 0, 0, 0.6), 0 1px 2px rgba(0, 0, 0, 0.9);
-}
-
->>>>>>> 4f85083178f8b115d363926610fb353083943434
 .detail-name {
   font-family: var(--font-display);
   font-size: 1.1rem;
@@ -1451,11 +1423,12 @@ body {
 
 .detail-stats {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
 .stat-box {
-  flex: 1;
+  flex: 1 1 200px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1522,6 +1495,10 @@ body {
 .init-input-row .btn {
   flex-shrink: 0;
   padding: 6px 7px;
+}
+
+.init-input-row .btn-icon {
+  padding: 0;
 }
 
 .detail-hp-block {
@@ -1725,6 +1702,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
 }
 
@@ -1770,42 +1748,78 @@ body {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 0.85rem;
   cursor: pointer;
   padding: 0 2px;
   line-height: 1;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.statblock-info-btn img {
+  width: 30px;
+  height: 30px;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+/* ~15% smaller in the left panel's library rows (monster/player lists)
+   specifically -- the turn-row table version keeps the full 30px. */
+.monster-row-name .statblock-info-btn img {
+  width: 26px;
+  height: 26px;
+}
+
+.statblock-info-btn:hover img {
+  opacity: 1;
+  filter: drop-shadow(0 0 3px rgba(201, 168, 118, 0.6));
 }
 
 /* In the turn list (wider row), push the info/remove buttons to the
    row's right edge instead of sitting right after the name. In the
    library list (tight flex container around just the name) this isn't
    applied, so the button sits naturally right after the name. */
-.statblock-info-btn:hover {
-  color: var(--gold);
-}
 
 .remove-instance-btn {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 0.8rem;
   cursor: pointer;
   padding: 0 2px;
   line-height: 1;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.remove-instance-btn img {
+  width: 30px;
+  height: 30px;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.remove-instance-btn:hover img {
+  opacity: 1;
+  filter: drop-shadow(0 0 3px rgba(168, 68, 68, 0.7));
 }
 
 .anonymize-toggle-btn {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 0.8rem;
   cursor: pointer;
   padding: 0 2px;
   line-height: 1;
   flex-shrink: 0;
   opacity: 0.55;
+  display: inline-flex;
+  align-items: center;
+}
+
+.anonymize-toggle-btn img {
+  width: 30px;
+  height: 30px;
 }
 
 .anonymize-toggle-btn:hover {
@@ -1815,24 +1829,16 @@ body {
 /* Active = this monster IS currently anonymized in the player view --
    colored so the DM can spot hidden monsters at a glance in the turn
    list, same visual language as other "this is toggled on" indicators
-   elsewhere in the app (e.g. group-selection's steel-blue accent). */
+   elsewhere in the app (e.g. group-selection's steel-blue accent).
+   color: var(--steel-blue) has no effect on the <img> icon itself, so
+   a blue-tinting filter recreates the same at-a-glance distinction. */
 .anonymize-toggle-btn-active {
   opacity: 1;
   color: var(--steel-blue);
 }
 
-.remove-instance-btn:hover {
-  color: var(--red-blood);
-}
-
-.manual-init-tag {
-  font-size: 0.68rem;
-  color: var(--steel-blue);
-  border: 1px solid var(--steel-blue-dim);
-  border-radius: var(--radius-sm);
-  padding: 6px 6px;
-  white-space: nowrap;
-  flex-shrink: 0;
+.anonymize-toggle-btn-active img {
+  filter: sepia(1) saturate(3) hue-rotate(165deg) brightness(1.1);
 }
 
 /* =========================================================================

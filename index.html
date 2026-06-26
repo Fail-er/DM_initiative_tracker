@@ -8,8 +8,12 @@
 </head>
 <body>
 
+  <div class="app-logo-overlay" aria-hidden="true">
+    <img src="assets/icons/logo-header.png" alt="" />
+  </div>
+
   <nav class="icon-rail" aria-label="Navigace">
-    <div class="icon-rail-logo" title="DM Encounter Tracker">⚔️</div>
+    <div class="icon-rail-logo-spacer" aria-hidden="true"></div>
     <button id="undo-btn" class="icon-rail-btn" type="button" title="Vrátit poslední akci (Ctrl+Z)"><img src="assets/icons/icon-undo.png" alt="Undo" /></button>
     <button id="combat-log-btn" class="icon-rail-btn" type="button" title="Otevřít Combat Log"><img src="assets/icons/icon-combat-log.png" alt="Combat Log" /></button>
     <button id="backup-btn" class="icon-rail-btn" type="button" title="Stáhnout zálohu všech dat (monstra, hráči, kouzla, encounter, log)"><img src="assets/icons/icon-backup.png" alt="Backup" /></button>
@@ -21,7 +25,7 @@
   <div class="app-main-column">
 
   <header class="app-header">
-    <h1 class="app-title">DM Encounter Tracker</h1>
+    <h1 class="app-title"><span class="visually-hidden">DM Encounter Tracker</span></h1>
 
     <div class="spellbook-search-container">
       <div class="spellbook-search-row">

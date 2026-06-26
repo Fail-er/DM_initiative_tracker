@@ -43,6 +43,29 @@ const Encounter = (() => {
     'Concentration',
   ];
 
+  // Mechanical summaries written in plain language, not quoted from any
+  // rulebook -- each one paraphrases the general effect of the
+  // condition for the DM's quick reference, not a verbatim rules
+  // citation.
+  const CONDITION_DETAILS = {
+    Prone: 'Attack rolls against this creature from nearby attackers get advantage; from far away (ranged), they get disadvantage. The creature itself attacks at disadvantage. Standing up costs half its movement for the turn.',
+    Grappled: 'Movement speed becomes 0 (can\'t benefit from any speed bonus either). Ends automatically if the grappler is incapacitated, or if something moves the creature out of the grappler\'s reach.',
+    Restrained: 'Movement speed becomes 0. Attack rolls against this creature get advantage, while its own attacks are at disadvantage. It also has disadvantage on Dexterity saving throws.',
+    Poisoned: 'Disadvantage on both attack rolls and ability checks for as long as the poison lasts.',
+    Frightened: 'Disadvantage on attack rolls and ability checks while the source of fear is within line of sight. The creature can\'t willingly move closer to whatever is frightening it.',
+    Charmed: 'Can\'t attack the charmer or target it with harmful abilities. The charmer gets advantage on social ability checks made to interact with this creature.',
+    Paralyzed: 'Incapacitated and can\'t move or speak. Automatically fails Strength and Dexterity saves. Attacks against it get advantage, and any hit from within 5 feet is an automatic critical.',
+    Stunned: 'Incapacitated, can\'t move, and can only speak falteringly. Automatically fails Strength and Dexterity saves. Attacks against it get advantage.',
+    Unconscious: 'Incapacitated, can\'t move or speak, and is unaware of its surroundings. Drops anything held and falls prone. Automatically fails Strength and Dexterity saves. Attacks against it get advantage, and any hit from within 5 feet is an automatic critical.',
+    Invisible: 'Impossible to see without magical aid or a special sense, regardless of lighting. Counts as heavily obscured for the purpose of hiding. Attack rolls against this creature have disadvantage, while its own attacks get advantage.',
+    Blinded: 'Can\'t see, so automatically fails any check that requires sight. Attack rolls against this creature get advantage, while its own attacks are at disadvantage.',
+    Deafened: 'Can\'t hear, so automatically fails any check that requires hearing.',
+    Incapacitated: 'Can\'t take actions or reactions, though it can still move (unless something else also restricts that). A baseline that several other conditions (e.g. Paralyzed, Stunned, Unconscious) layer on top of.',
+    Petrified: 'Transformed to solid stone (with anything worn/carried) and is incapacitated, unaware of surroundings, can\'t move or speak. Attacks against it get advantage. Automatically fails Strength and Dexterity saves. Resistance to all damage, and immune to poison and disease.',
+    Exhaustion: 'Tracked in escalating levels rather than on/off -- each level applies a cumulative penalty (e.g. disadvantage on ability checks, reduced speed, fewer max HP), stacking further at higher levels until level 6 results in death. Usually reduced by one level after a long rest.',
+    Concentration: 'Tracks a spell or effect that requires ongoing focus to maintain. Taking damage forces a Constitution save (DC 10 or half the damage, whichever is higher) to keep it active; casting another concentration spell or being incapacitated ends it immediately.',
+  };
+
   const DURATION_TYPES = ['manual', 'rounds', 'startOfTurn', 'endOfTurn', 'saveEnds'];
 
   function conditionUid() {
@@ -877,6 +900,7 @@ const Encounter = (() => {
 
   return {
     CONDITIONS,
+    CONDITION_DETAILS,
     DURATION_TYPES,
     createEmpty,
     setState,

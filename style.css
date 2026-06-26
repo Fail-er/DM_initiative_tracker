@@ -21,20 +21,19 @@
      enough that text/content remains fully legible -- this is meant as
      a faint hint of texture, not a visible pattern competing with the
      UI for attention. */
-  --bg-ink-translucent: rgba(13, 16, 18, 0.58);
   --bg-panel-translucent: rgba(20, 24, 27, 0.54);
   --bg-panel-raised-translucent: rgba(27, 32, 36, 0.52);
   --border-soft-translucent: rgba(42, 48, 52, 0.50);
 
-  /* Icon rail panel width tracking: base is the original size before any
-     resizing, current is whatever it actually is now. The difference
-     between them is the exact amount the right COLUMN's width gets
-     reduced by (see .app-layout below) -- so growing/shrinking the
-     panel always comes specifically out of the right column's share,
-     never redistributed proportionally across all three columns via
-     their normal fr-based scaling. */
-  --icon-rail-base-width: 52px;
+  /* Icon rail panel width -- actual rendered width is tracked here.
+     setupResponsiveColumnWidths() (in ui.js) reads this via
+     getComputedStyle to compute the other columns' widths in
+     JavaScript, rather than through a pure-CSS calc() approach (which
+     doesn't reliably support fr+px mixing in grid-template-columns,
+     per earlier debugging in this project). */
   --icon-rail-current-width: 68px;
+  --app-header-height: 63px;
+  --app-logo-width: 470px;
   --border-soft: #2a3034;
   --border-strong: #3a4248;
   --gold: #c9a876;
@@ -55,23 +54,6 @@
   --pc-teal-dim: #2d5552;
   --mon-red: #c97a73;
   --mon-red-dim: #5c2e2b;
-
-  /* Condition-type accent colors, for the color-coded chips the
-     visualization uses (e.g. Poisoned=green, Frightened=purple,
-     Shield/SOT=blue, Prone/EOT=orange, Paralyzed/Save=purple,
-     Concentration=amber). Conditions aren't hardcoded to specific
-     colors in code -- see the chip-coloring logic in ui.js -- these are
-     just the palette swatches it draws from. */
-  --cond-green: #8aa86a;
-  --cond-green-dim: #3d4a2e;
-  --cond-purple: #9a8ac9;
-  --cond-purple-dim: #423a5c;
-  --cond-blue: #7aa3c9;
-  --cond-blue-dim: #34495c;
-  --cond-orange: #c98a5a;
-  --cond-orange-dim: #5c3d28;
-  --cond-amber: #c9a25a;
-  --cond-amber-dim: #5c4a28;
 
   /* ---- type ---- */
   --font-display: 'Cinzel', Georgia, 'Times New Roman', serif;
@@ -104,6 +86,43 @@ body {
   background-image: url('assets/background-tile.png');
   background-size: 700px 700px;
   background-repeat: repeat;
+}
+
+/* Single full logo overlay. It is outside .app-main-column, so it can
+   extend across the icon rail and the header without being clipped. */
+.app-logo-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--app-logo-width);
+  height: var(--app-header-height);
+  z-index: 1000;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: visible;
+}
+
+.app-logo-overlay img {
+  display: block;
+  height: var(--app-header-height);
+  width: auto;
+  max-width: var(--app-logo-width);
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* =========================================================================
@@ -172,10 +191,10 @@ body {
   gap: 4px;
 }
 
-.icon-rail-logo {
-  font-size: 1.82rem;
+.icon-rail-logo-spacer {
+  width: 44px;
+  height: 44px;
   margin-bottom: 14px;
-  filter: drop-shadow(0 0 4px rgba(201, 168, 118, 0.3));
 }
 
 .icon-rail-btn {
@@ -228,21 +247,26 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 20px;
+  height: var(--app-header-height);
+  min-height: var(--app-header-height);
+  padding: 0 20px 0 0;
   background: linear-gradient(180deg, var(--bg-panel-raised-translucent), var(--bg-panel-translucent));
   border-bottom: 2px solid var(--border-strong);
   flex-shrink: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  position: relative;
+  z-index: 20;
 }
 
+/* Invisible spacer that reserves the part of the 470px logo that lies
+   inside the header. The visible logo itself is rendered once by
+   .app-logo-overlay, starting at the far left edge of the icon rail. */
 .app-title {
-  font-family: var(--font-display);
-  font-size: 1.3rem;
-  letter-spacing: 0.04em;
-  color: var(--gold);
   margin: 0;
-  font-weight: 600;
-  flex-shrink: 0;
+  height: var(--app-header-height);
+  flex: 0 0 calc(var(--app-logo-width) - var(--icon-rail-current-width));
+  width: calc(var(--app-logo-width) - var(--icon-rail-current-width));
+  min-width: 0;
 }
 
 .header-shortcuts {
@@ -660,6 +684,8 @@ body {
   flex: 1;
   min-height: 0;
   min-width: 0;
+  border: 1px solid var(--gold-dim);
+  border-radius: var(--radius-md);
   /* Scrollbar sits closer to the panel's outer edge (away from window
      content) rather than right against the card content -- the content
      containers below get extra right padding to compensate, so cards
@@ -1306,6 +1332,24 @@ body {
   height: 16px;
   flex-shrink: 0;
   display: block;
+}
+
+/* Strips default button chrome so this looks identical to a plain
+   icon, while still being a real <button> for accessibility/keyboard
+   support. A subtle hover brightness change hints it's clickable. */
+.condition-detail-trigger {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.condition-detail-trigger:hover .condition-tag-icon {
+  filter: brightness(1.3);
 }
 
 /* Turn-row table specifically gets larger icons by default (30px) --
@@ -1985,87 +2029,6 @@ body {
 }
 
 /* =========================================================================
-   Stat strip (bullet D) -- abilities + modifier + save bonus, passives,
-   speed, senses. Saves are visually emphasized since the DM looks them
-   up constantly mid-combat.
-   ========================================================================= */
-
-.stat-strip {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.stat-strip-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.stat-strip-row {
-  display: grid;
-  grid-template-columns: 36px 28px 32px auto 40px;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  padding: 3px 6px;
-  border-radius: var(--radius-sm);
-}
-
-.stat-strip-row:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.stat-strip-ability {
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.stat-strip-score {
-  color: var(--text-parchment);
-}
-
-.stat-strip-mod {
-  color: var(--text-muted);
-}
-
-.stat-strip-save-label {
-  font-size: 0.66rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  text-align: right;
-}
-
-/* Saves get more visual weight than the raw ability score/modifier,
-   per the explicit request that the DM looks these up most often. */
-.stat-strip-save {
-  color: var(--gold);
-  font-weight: 700;
-  text-align: right;
-}
-
-.stat-strip-passives {
-  border-top: 1px solid var(--border-soft);
-  padding-top: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.stat-strip-passive-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.78rem;
-  color: var(--text-parchment);
-}
-
-.stat-strip-passive-row span:first-child {
-  color: var(--text-muted);
-}
-
-/* =========================================================================
    Accordion (bullet E) -- collapsible detail sections
    ========================================================================= */
 
@@ -2167,6 +2130,8 @@ body {
 .panel-reminders {
   overflow: hidden;
   padding-right: 4px;
+  border: 1px solid var(--gold-dim);
+  border-radius: var(--radius-md);
 }
 
 .panel-reminders-header {
@@ -2292,6 +2257,12 @@ body {
 .statblock-line {
   margin-bottom: 8px;
   color: var(--text-parchment);
+}
+
+.condition-detail-text {
+  color: var(--text-parchment);
+  line-height: 1.5;
+  margin: 0;
 }
 
 .statblock-abilities {
@@ -2766,6 +2737,19 @@ body {
 
   .header-shortcuts {
     display: none;
+  }
+
+  .app-logo-overlay {
+    width: min(var(--app-logo-width), 70vw);
+  }
+
+  .app-logo-overlay img {
+    width: 100%;
+  }
+
+  .app-title {
+    flex-basis: calc(min(var(--app-logo-width), 70vw) - var(--icon-rail-current-width));
+    width: calc(min(var(--app-logo-width), 70vw) - var(--icon-rail-current-width));
   }
 
   .spellbook-search-container {

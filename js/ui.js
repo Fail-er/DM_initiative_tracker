@@ -67,6 +67,12 @@ const UI = (() => {
   // The two are mutually exclusive -- only one of statblockOpenForId /
   // statblockOpenForTemplate is ever non-null at a time.
   let statblockOpenForTemplate = null;
+  // When the open popover is a condition's mechanical-detail card (per
+  // the condition-icon click feature), this holds the condition's name
+  // string instead. Mutually exclusive with the two above -- a
+  // condition card has nothing live to stay in sync with, similar to
+  // the library-template case.
+  let statblockOpenForCondition = null;
   // Every monster/player can have its own independently pinned floating
   // card now -- each entry is a DraggablePanel instance spawned via
   // DraggablePanel.spawnDetached() at the moment the live preview was
@@ -139,6 +145,7 @@ const UI = (() => {
       onClose: () => {
         statblockOpenForId = null;
         statblockOpenForTemplate = null;
+        statblockOpenForCondition = null;
       },
       onPinRequested: () => {
         const rect = el.statblockPopover.getBoundingClientRect();
@@ -788,6 +795,21 @@ const UI = (() => {
         requestRemoveInstance(inst.instanceId);
       });
 
+      // Condition detail triggers: opens the mechanical-summary card
+      // for that specific condition, WITHOUT selecting the row. A
+      // direct per-button listener (not the document-level delegated
+      // one registered in wireTopLevelControls) is required here --
+      // bubbling fires listeners closer to the click target first, so
+      // the row's own click handler below would otherwise select the
+      // combatant before a stopPropagation() from a document-level
+      // listener ever got the chance to run.
+      row.querySelectorAll('.condition-detail-trigger').forEach((trigger) => {
+        trigger.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openConditionDetailPopover(trigger.dataset.conditionName, trigger);
+        });
+      });
+
       // Row click: plain click toggles detail focus (click again to unfocus)
       // AND sets the shift-click anchor. Ctrl/Cmd+click toggles grouping
       // selection for just this row without moving the anchor. Shift+click
@@ -932,9 +954,10 @@ const UI = (() => {
     // real icon files exist.
     const iconUrl = `assets/conditions/${c.name.toLowerCase()}.png`;
     const fallbackId = `cond-fallback-${c.id}`;
-    const icon = `<img src="${iconUrl}" alt="${escapeHtml(c.name)}" title="${escapeHtml(c.name)}" class="condition-tag-icon" onerror="this.style.display='none'; document.getElementById('${fallbackId}').style.display='';" /><span id="${fallbackId}" class="condition-tag-fallback-text" style="display:none">${escapeHtml(c.name)}</span>`;
+    const icon = `<img src="${iconUrl}" alt="${escapeHtml(c.name)}" class="condition-tag-icon" onerror="this.style.display='none'; document.getElementById('${fallbackId}').style.display='';" /><span id="${fallbackId}" class="condition-tag-fallback-text" style="display:none">${escapeHtml(c.name)}</span>`;
+    const iconButton = `<button type="button" class="condition-detail-trigger" data-condition-name="${escapeHtml(c.name)}" title="${escapeHtml(c.name)} -- klikni pro detail" aria-label="Zobrazit detail stavu ${escapeHtml(c.name)}">${icon}</button>`;
     const suffixHtml = suffix ? `<span class="condition-tag-suffix">${escapeHtml(suffix)}</span>` : '';
-    return `<span class="condition-tag${removable ? ' condition-tag-removable' : ''}${expiredClass}" data-condition-id="${c.id}">${expiredMark}${icon}${suffixHtml}${removeBtn}</span>`;
+    return `<span class="condition-tag${removable ? ' condition-tag-removable' : ''}${expiredClass}" data-condition-id="${c.id}">${expiredMark}${iconButton}${suffixHtml}${removeBtn}</span>`;
   }
 
   /** Shared header + stat row + HP block + conditions, used by both monster
@@ -1338,6 +1361,16 @@ const UI = (() => {
   function wireDetailEvents(inst) {
     const name = inst.publicName || inst.displayName;
 
+    // Condition detail triggers in the "Stavy" section's chips -- same
+    // click-opens-the-mechanical-summary-card behavior as the turn-row
+    // table's chips.
+    document.querySelectorAll('.detail-section .condition-detail-trigger').forEach((trigger) => {
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openConditionDetailPopover(trigger.dataset.conditionName, trigger);
+      });
+    });
+
     const acInput = document.getElementById('detail-ac');
     function commitAc() {
       const newAc = parseInt(acInput.value, 10) || 0;
@@ -1707,6 +1740,24 @@ const UI = (() => {
     statblockOpenForTemplate = { sourceType, templateId };
     el.statblockTitle.textContent = tpl.name;
     el.statblockBody.innerHTML = buildStatblockBodyFromTemplate(sourceType, tpl);
+    positionStatblockPopover(anchorEl);
+  }
+
+  /** Opens the floating popover showing a condition's mechanical
+   *  summary (CONDITION_DETAILS), reusing the same panel/positioning
+   *  machinery as the monster/player stat block popover rather than a
+   *  separate floating-card system -- same "live preview slot,
+   *  pinnable into an independent detached card" pattern, just with
+   *  static condition text instead of a combatant's stats. */
+  function openConditionDetailPopover(conditionName, anchorEl) {
+    const detail = Encounter.CONDITION_DETAILS[conditionName];
+    if (!detail) return;
+
+    statblockOpenForId = null;
+    statblockOpenForTemplate = null;
+    statblockOpenForCondition = conditionName;
+    el.statblockTitle.textContent = conditionName;
+    el.statblockBody.innerHTML = `<p class="condition-detail-text">${escapeHtml(detail)}</p>`;
     positionStatblockPopover(anchorEl);
   }
 
@@ -2213,9 +2264,9 @@ const UI = (() => {
     // encounter combatant or a library-template preview. Pinned popovers
     // are left alone -- requestClose() is a no-op while pinned.
     document.addEventListener('click', (e) => {
-      if (!statblockOpenForId && !statblockOpenForTemplate) return;
+      if (!statblockOpenForId && !statblockOpenForTemplate && !statblockOpenForCondition) return;
       if (el.statblockPopover.contains(e.target)) return;
-      if (e.target.closest && e.target.closest('.statblock-info-btn')) return;
+      if (e.target.closest && (e.target.closest('.statblock-info-btn') || e.target.closest('.condition-detail-trigger'))) return;
       closeStatblockPopover();
     });
 
@@ -2246,7 +2297,7 @@ const UI = (() => {
       // closing it is the only thing this Escape press does. If it's
       // pinned (so nothing closed), or nothing was open, fall through to
       // the selection-clearing behavior below instead of doing nothing.
-      if (e.key === 'Escape' && (statblockOpenForId || statblockOpenForTemplate) && !statblockPanel.isPinned()) {
+      if (e.key === 'Escape' && (statblockOpenForId || statblockOpenForTemplate || statblockOpenForCondition) && !statblockPanel.isPinned()) {
         closeStatblockPopover();
         return;
       }

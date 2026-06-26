@@ -891,7 +891,6 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
   gap: 4px 8px;
   min-width: 0;
 }
@@ -908,6 +907,7 @@ body {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .qty-input {
@@ -1051,7 +1051,7 @@ body {
 
 .turn-list-header {
   display: grid;
-  grid-template-columns: 24px 44px 52px 1.4fr 40px 130px 1fr 90px;
+  grid-template-columns: 24px 44px 52px 1.4fr 40px 130px 0.6fr 150px;
   gap: 10px;
   padding: 0 10px 6px 10px;
   font-size: 0.68rem;
@@ -1074,7 +1074,7 @@ body {
 
 .turn-row {
   display: grid;
-  grid-template-columns: 24px 44px 52px 1.4fr 40px 130px 1fr 90px;
+  grid-template-columns: 24px 44px 52px 1.4fr 40px 130px 0.6fr 150px;
   align-items: center;
   gap: 10px;
   background: var(--bg-panel-raised-translucent);
@@ -1206,6 +1206,7 @@ body {
   min-width: 0;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
 }
 
@@ -1265,6 +1266,9 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+.condition-tags-editable {
   margin-top: 5px;
 }
 
@@ -1284,6 +1288,51 @@ body {
   color: var(--text-parchment);
 }
 
+/* Turn-row table specifically: icon-only chips don't need the pill
+   background/border/padding (those were leftover from the old
+   text-based chip design) -- just the icon and duration suffix sitting
+   directly in the row, which also means each chip takes up exactly the
+   icon's own size rather than icon+padding+border, leaving more room
+   for the per-row shrink-to-fit logic to work with. */
+.turn-row-conditions-col .condition-tag {
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.condition-tag-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  display: block;
+}
+
+/* Turn-row table specifically gets larger icons by default (30px) --
+   per-row shrink-to-fit logic (see fitConditionIcons() in ui.js) can
+   override this with an inline style when a combatant has too many
+   conditions to fit at full size within two rows. */
+.turn-row-conditions-col .condition-tag-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.condition-tag-fallback-text {
+  font-size: 0.68rem;
+}
+
+.condition-tag-suffix {
+  font-size: 0.65rem;
+  color: var(--gold-dim);
+  font-family: var(--font-mono);
+}
+
+.condition-tag-overflow-mark {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
 .condition-remove {
   background: none;
   border: none;
@@ -1294,15 +1343,59 @@ body {
   line-height: 1;
 }
 
-.condition-select {
+.condition-combobox {
+  position: relative;
+  flex: 1 1 110px;
+  min-width: 0;
+}
+
+.condition-search-input {
+  width: 100%;
   background: var(--bg-ink);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   color: var(--text-parchment);
   padding: 6px;
   font-size: 0.78rem;
-  flex: 1 1 110px;
-  min-width: 0;
+}
+
+.condition-search-input:focus {
+  outline: none;
+  border-color: var(--gold-dim);
+}
+
+.condition-dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--gold-dim);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.condition-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 0.78rem;
+  color: var(--text-parchment);
+  cursor: pointer;
+}
+
+.condition-option:hover {
+  background: var(--border-soft);
+}
+
+.condition-option-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
 /* Expired conditions stay visually compact (bullet C: "nesmí to zabrat
@@ -1839,6 +1932,56 @@ body {
 
 .anonymize-toggle-btn-active img {
   filter: sepia(1) saturate(3) hue-rotate(165deg) brightness(1.1);
+}
+
+.hide-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0.55;
+  display: inline-flex;
+  align-items: center;
+}
+
+.hide-toggle-btn img {
+  width: 30px;
+  height: 30px;
+}
+
+.hide-toggle-btn:hover {
+  opacity: 1;
+}
+
+/* Active = this monster is CURRENTLY hidden from the player view
+   entirely (not just name-hidden like anonymize) -- a red tint marks
+   this as the more significant/attention-worthy state, consistent with
+   the app's use of red for critical states elsewhere (low HP, Dead tag). */
+.hide-toggle-btn-active {
+  opacity: 1;
+  color: var(--red-blood);
+}
+
+.hide-toggle-btn-active img {
+  filter: sepia(1) saturate(4) hue-rotate(-30deg) brightness(0.95);
+}
+
+/* Tag shown next to a hidden monster's name in the DM's turn list (NOT
+   sent to the player view) -- a quick at-a-glance reminder of which
+   monsters are currently invisible to players, same visual pattern as
+   the existing "DEAD" tag. */
+.hidden-tag {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--red-blood);
+  border: 1px solid var(--red-blood-dim);
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
 }
 
 /* =========================================================================

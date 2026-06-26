@@ -579,6 +579,71 @@ const UI = (() => {
   // MIDDLE PANEL: turn order list
   // -------------------------------------------------------------------
 
+  /** Shrinks a turn-row's condition icons to fit within 2 rows, if they
+   *  don't already fit at the default 30px size -- per-row, so other
+   *  combatants with fewer conditions keep full-size icons. Tries
+   *  decreasing sizes (30px down to a 10px floor, in 2px steps) until
+   *  the icons (each icon-width + gap) fit N-per-row such that
+   *  ceil(count / perRow) <= 2. If even the 10px floor can't fit
+   *  everything in 2 rows, truncates the displayed icons to however
+   *  many DO fit and appends a "…" placeholder for the rest -- the
+   *  full list remains visible in the detail panel regardless, this
+   *  column just can't show all of them at a legible size.
+   *
+   *  Must run AFTER the row is in the DOM (needs real clientWidth from
+   *  layout, not a value computed before render). */
+  function fitConditionIcons(colEl) {
+    const icons = Array.from(colEl.querySelectorAll('.condition-tag-icon, .condition-tag-fallback-text'));
+    // Only count one element per chip (icon OR its fallback, whichever
+    // is actually visible) -- but since both exist in the DOM with one
+    // hidden via onerror, just count chips directly instead.
+    const chips = Array.from(colEl.querySelectorAll('.condition-tag'));
+    if (chips.length === 0) return;
+
+    const GAP = 4; // matches .turn-row-conditions-col's gap
+    const MAX_ROWS = 2;
+    const MIN_SIZE = 10;
+    const MAX_SIZE = 30;
+    const colWidth = colEl.clientWidth;
+    if (colWidth <= 0) return; // not laid out yet (e.g. hidden panel) -- skip rather than divide by zero
+
+    function rowsNeededAt(size) {
+      const perRow = Math.max(1, Math.floor((colWidth + GAP) / (size + GAP)));
+      return { perRow, rows: Math.ceil(chips.length / perRow) };
+    }
+
+    let chosenSize = MAX_SIZE;
+    let chosenPerRow = rowsNeededAt(MAX_SIZE).perRow;
+    for (let size = MAX_SIZE; size >= MIN_SIZE; size -= 2) {
+      const { perRow, rows } = rowsNeededAt(size);
+      chosenSize = size;
+      chosenPerRow = perRow;
+      if (rows <= MAX_ROWS) break;
+    }
+
+    chips.forEach((chip) => {
+      const icon = chip.querySelector('.condition-tag-icon');
+      const fallback = chip.querySelector('.condition-tag-fallback-text');
+      if (icon) { icon.style.width = `${chosenSize}px`; icon.style.height = `${chosenSize}px`; }
+      if (fallback) { fallback.style.fontSize = `${Math.max(8, chosenSize * 0.45)}px`; }
+    });
+
+    // Even at the minimum size, everything still doesn't fit in 2 rows
+    // -- truncate to what DOES fit and show "…" in the last visible
+    // slot, per the agreed fallback (full list stays in the detail panel).
+    const maxVisible = chosenPerRow * MAX_ROWS;
+    if (chips.length > maxVisible) {
+      chips.forEach((chip, i) => {
+        if (i < maxVisible - 1) return; // first (maxVisible - 1) chips stay visible as-is
+        if (i === maxVisible - 1) {
+          chip.innerHTML = '<span class="condition-tag-overflow-mark" title="Další stavy -- viz detail panel">…</span>';
+        } else {
+          chip.style.display = 'none';
+        }
+      });
+    }
+  }
+
   function renderEncounter() {
     const state = Encounter.getState();
     const ordered = Encounter.sortedInstances();
@@ -629,6 +694,16 @@ const UI = (() => {
         ? `<button class="anonymize-toggle-btn${inst.isAnonymized ? ' anonymize-toggle-btn-active' : ''}" type="button" data-instance-id="${inst.instanceId}" title="${inst.isAnonymized ? 'Zobrazit skutečné jméno v Player View' : 'Skrýt jméno v Player View (zobrazí se jako Nepřítel N)'}" aria-label="Přepnout anonymizaci v Player View"><img src="assets/icons/icon-anonymize.png" alt="" /></button>`
         : '';
 
+      // Hidden monsters don't appear in the player view AT ALL (a
+      // stronger form of secrecy than anonymize, which still shows a
+      // generic "Nepřítel N" row) -- for monsters players don't know
+      // are present yet. Icon shows the CURRENT visibility state (open
+      // eye = currently visible, closed eye = currently hidden), same
+      // pattern as the anonymize button's active-state styling.
+      const hideToggleBtnHtml = !isPlayer
+        ? `<button class="hide-toggle-btn${inst.isHidden ? ' hide-toggle-btn-active' : ''}" type="button" data-instance-id="${inst.instanceId}" title="${inst.isHidden ? 'Zobrazit hráčům (objeví se v Player View)' : 'Skrýt před hráči úplně (nebude v Player View, tah se přeskočí)'}" aria-label="Přepnout viditelnost pro hráče"><img src="${inst.isHidden ? 'assets/icons/icon-hidden.png' : 'assets/icons/icon-visible.png'}" alt="" /></button>`
+        : '';
+
       row.innerHTML = `
         <input type="checkbox" class="group-checkbox" ${isGroupSelected ? 'checked' : ''} aria-label="Vybrat do skupiny" />
         <div class="turn-row-init">${initDisplay}</div>
@@ -638,6 +713,7 @@ const UI = (() => {
             ${isActive ? '<span class="active-marker" title="Aktivní tah">&#9876;</span>' : ''}
             <span class="turn-row-name-text">${escapeHtml(inst.publicName || inst.displayName)}</span>
             ${inst.isDead ? '<span class="dead-tag">DEAD</span>' : ''}
+            ${inst.isHidden ? '<span class="hidden-tag" title="Skryto před hráči">SKRYTO</span>' : ''}
           </div>
         </div>
         <div class="turn-row-ac">${inst.armorClass}</div>
@@ -651,6 +727,7 @@ const UI = (() => {
           ${inst.conditions.length ? `<div class="condition-tags">${inst.conditions.map(c => buildConditionChip(c, false)).join('')}</div>` : '<span class="turn-row-no-conditions">—</span>'}
         </div>
         <div class="turn-row-actions">
+          ${hideToggleBtnHtml}
           ${anonymizeBtnHtml}
           <button class="statblock-info-btn" type="button" data-instance-id="${inst.instanceId}" title="Stat block" aria-label="Zobrazit stat block"><img src="assets/icons/icon-statblock.png" alt="" /></button>
           <button class="remove-instance-btn" type="button" data-instance-id="${inst.instanceId}" title="Odstranit z encounteru (Delete)" aria-label="Odstranit z encounteru"><img src="assets/icons/icon-remove.png" alt="" /></button>
@@ -679,6 +756,18 @@ const UI = (() => {
         anonymizeBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           mutate(null, () => Encounter.toggleMonsterAnonymization(inst.instanceId));
+        });
+      }
+
+      const hideBtn = row.querySelector('.hide-toggle-btn');
+      if (hideBtn) {
+        hideBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const name = inst.publicName || inst.displayName;
+          mutate(
+            () => (inst.isHidden ? `${name} hidden from players` : `${name} revealed to players`),
+            () => Encounter.toggleMonsterHidden(inst.instanceId)
+          );
         });
       }
 
@@ -723,6 +812,12 @@ const UI = (() => {
 
       el.turnList.appendChild(row);
     });
+
+    // Fit each row's condition icons AFTER all rows are in the DOM --
+    // doing this in a single pass here (rather than per-row inside the
+    // loop above) avoids layout thrashing from interleaving appendChild
+    // (write) with clientWidth (read) repeatedly.
+    el.turnList.querySelectorAll('.turn-row-conditions-col').forEach(fitConditionIcons);
 
     renderDetail();
   }
@@ -822,14 +917,24 @@ const UI = (() => {
    *  no "Expired" text label, just the marker). */
   function buildConditionChip(c, removable) {
     const suffix = conditionDurationSuffix(c);
-    const label = c.name === 'Concentration' ? 'Conc.' : c.name;
-    const text = suffix ? `${escapeHtml(label)} · ${escapeHtml(suffix)}` : escapeHtml(label);
     const expiredClass = c.expired ? ' condition-tag-expired' : '';
     const expiredMark = c.expired ? '<span class="condition-tag-expired-mark" title="Vypršelo">!</span>' : '';
     const removeBtn = removable
       ? `<button class="condition-remove" data-condition-id="${c.id}" aria-label="Odebrat stav ${escapeHtml(c.name)}">&times;</button>`
       : '';
-    return `<span class="condition-tag${removable ? ' condition-tag-removable' : ''}${expiredClass}" data-condition-id="${c.id}">${expiredMark}${text}${removeBtn}</span>`;
+    // Icon replaces the condition NAME (per the agreed "chip shows icon
+    // only" rule); the duration suffix (rounds remaining / SOT / EOT /
+    // Save) stays as small text next to it. onerror falls back to the
+    // name as plain text if the icon file isn't present yet (the user
+    // is adding these to assets/conditions/ separately) -- the
+    // fallback span starts hidden and is only revealed by onerror,
+    // rather than always showing both and looking duplicated once the
+    // real icon files exist.
+    const iconUrl = `assets/conditions/${c.name.toLowerCase()}.png`;
+    const fallbackId = `cond-fallback-${c.id}`;
+    const icon = `<img src="${iconUrl}" alt="${escapeHtml(c.name)}" title="${escapeHtml(c.name)}" class="condition-tag-icon" onerror="this.style.display='none'; document.getElementById('${fallbackId}').style.display='';" /><span id="${fallbackId}" class="condition-tag-fallback-text" style="display:none">${escapeHtml(c.name)}</span>`;
+    const suffixHtml = suffix ? `<span class="condition-tag-suffix">${escapeHtml(suffix)}</span>` : '';
+    return `<span class="condition-tag${removable ? ' condition-tag-removable' : ''}${expiredClass}" data-condition-id="${c.id}">${expiredMark}${icon}${suffixHtml}${removeBtn}</span>`;
   }
 
   /** Shared header + stat row + HP block + conditions, used by both monster
@@ -957,8 +1062,23 @@ const UI = (() => {
    *  Nothing about the controls themselves changed, only where their
    *  markup ends up in the overall panel. */
   function renderHpAndConditionsBody(inst) {
+    /** Builds the lowercase filename (no extension) for a condition's
+     *  icon, per the agreed convention: assets/conditions/<name>.png.
+     *  Concentration is the one exception with a different display
+     *  label ("Conc.") elsewhere in the UI, but the icon file itself is
+     *  still named after the condition itself, same as all the others. */
+    function conditionIconUrl(name) {
+      return `assets/conditions/${name.toLowerCase()}.png`;
+    }
+
     const conditionAllOptions = Encounter.CONDITIONS
-      .map((c) => `<option value="${c}">${c === 'Concentration' ? 'Concentration (Conc.)' : c}</option>`)
+      .map((c) => {
+        const label = c === 'Concentration' ? 'Concentration (Conc.)' : c;
+        return `<div class="condition-option" data-condition-name="${c}" tabindex="-1">
+          <img src="${conditionIconUrl(c)}" alt="" class="condition-option-icon" onerror="this.style.display='none'" />
+          <span>${label}</span>
+        </div>`;
+      })
       .join('');
 
     return `
@@ -1016,10 +1136,13 @@ const UI = (() => {
           ${inst.conditions.map((c) => buildConditionChip(c, true)).join('') || '<span class="empty-hint-inline">Žádné stavy</span>'}
         </div>
         <div class="condition-add-row">
-          <select id="condition-select" class="condition-select">
-            <option value="">Stav...</option>
-            ${conditionAllOptions}
-          </select>
+          <div class="condition-combobox">
+            <input type="text" id="condition-search-input" class="condition-search-input" placeholder="Stav..." autocomplete="off" />
+            <input type="hidden" id="condition-select" value="" />
+            <div id="condition-dropdown" class="condition-dropdown" style="display:none">
+              ${conditionAllOptions}
+            </div>
+          </div>
           <select id="condition-duration-select" class="condition-duration-select" title="Trvání">
             <option value="manual" selected>Manual</option>
             <option value="rounds">Rounds</option>
@@ -1347,9 +1470,94 @@ const UI = (() => {
     });
 
     const conditionSelect = document.getElementById('condition-select');
+    const conditionSearchInput = document.getElementById('condition-search-input');
+    const conditionDropdown = document.getElementById('condition-dropdown');
     const durationSelect = document.getElementById('condition-duration-select');
     const roundsInput = document.getElementById('condition-rounds-input');
     const addConditionBtn = document.getElementById('condition-add-btn');
+
+    const conditionOptionEls = Array.from(conditionDropdown.querySelectorAll('.condition-option'));
+
+    const conditionAccordionPlaque = conditionSearchInput.closest('.accordion-plaque');
+
+    function openConditionDropdown() {
+      conditionDropdown.style.display = '';
+      // accordion-plaque's overflow:hidden (needed for its rounded
+      // corners) would otherwise clip this dropdown wherever the
+      // "Stavy" section sits near the panel's edge -- suspend it only
+      // while the dropdown is actually open.
+      if (conditionAccordionPlaque) conditionAccordionPlaque.style.overflow = 'visible';
+    }
+
+    function closeConditionDropdown() {
+      conditionDropdown.style.display = 'none';
+      if (conditionAccordionPlaque) conditionAccordionPlaque.style.overflow = '';
+    }
+
+    function filterConditionOptions(query) {
+      const q = query.trim().toLowerCase();
+      conditionOptionEls.forEach((el) => {
+        const matches = !q || el.dataset.conditionName.toLowerCase().includes(q);
+        el.style.display = matches ? '' : 'none';
+      });
+    }
+
+    /** Commits a condition as the actual selection: sets the hidden
+     *  value, mirrors its label into the visible search input (so the
+     *  field shows what's chosen, matching how a native <select> would
+     *  display its current value), and closes the dropdown. */
+    function selectCondition(name) {
+      conditionSelect.value = name;
+      conditionSearchInput.value = name;
+      closeConditionDropdown();
+    }
+
+    conditionSearchInput.addEventListener('click', () => {
+      filterConditionOptions(conditionSearchInput.value);
+      openConditionDropdown();
+    });
+
+    conditionSearchInput.addEventListener('input', () => {
+      // Typing invalidates any previously committed selection -- the
+      // hidden value only becomes valid again once the user picks an
+      // option (click or exact-match Enter), same as how a native
+      // <select> has no "value" while its text equivalent doesn't
+      // match any option.
+      conditionSelect.value = '';
+      filterConditionOptions(conditionSearchInput.value);
+      openConditionDropdown();
+    });
+
+    conditionSearchInput.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const typed = conditionSearchInput.value.trim().toLowerCase();
+      const exactMatch = Encounter.CONDITIONS.find((c) => c.toLowerCase() === typed);
+      if (exactMatch) {
+        selectCondition(exactMatch);
+      }
+    });
+
+    conditionOptionEls.forEach((el) => {
+      el.addEventListener('click', () => {
+        selectCondition(el.dataset.conditionName);
+      });
+    });
+
+    // Click-outside-to-close: a one-time listener added only while the
+    // dropdown is actually open, and removed again once it closes by
+    // any means (outside click, Enter-select, option click) -- avoids
+    // accumulating permanent document-level listeners across repeated
+    // detail-panel re-renders (this whole wireDetailEvents function
+    // runs again every time the detail panel re-renders).
+    function handleOutsideClick(e) {
+      if (e.target === conditionSearchInput || conditionDropdown.contains(e.target)) return;
+      closeConditionDropdown();
+      document.removeEventListener('click', handleOutsideClick);
+    }
+    conditionSearchInput.addEventListener('click', () => {
+      document.addEventListener('click', handleOutsideClick);
+    });
 
     durationSelect.addEventListener('change', () => {
       roundsInput.style.display = durationSelect.value === 'rounds' ? '' : 'none';
@@ -1374,6 +1582,7 @@ const UI = (() => {
       // the agreed flow -- the next condition added starts fresh rather
       // than inheriting the previous one's duration settings.
       conditionSelect.value = '';
+      conditionSearchInput.value = '';
       durationSelect.value = 'manual';
       roundsInput.value = '';
       roundsInput.style.display = 'none';
@@ -1668,15 +1877,17 @@ const UI = (() => {
     const state = Encounter.getState();
     const activeId = Encounter.getActiveInstanceId();
 
-    // Dead monsters are excluded from the player view entirely -- unlike
-    // players (who may still need their turn for a death save and stay
-    // visible even at 0 HP), monsters have no equivalent mechanic once
-    // dead, and Next Turn already skips them (see encounter.js's
-    // isSkippableForTurnOrder). Filtering them out here keeps the
-    // player-facing list showing only "live" turn order, never a corpse
-    // lingering in the list.
+    // Dead OR hidden monsters are excluded from the player view entirely.
+    // Dead: unlike players (who may still need their turn for a death
+    // save and stay visible even at 0 HP), monsters have no equivalent
+    // mechanic once dead, and Next Turn already skips them (see
+    // encounter.js's isSkippableForTurnOrder). Hidden: for monsters the
+    // players don't know are present yet -- a stronger form of secrecy
+    // than isAnonymized (which still shows a generic "Nepřítel N" row;
+    // isHidden shows nothing at all). Both cases are also skipped by
+    // Next Turn/Previous Turn (same isSkippableForTurnOrder check).
     const visible = Encounter.sortedInstances().filter((inst) => {
-      return !(inst.sourceType === 'monster' && inst.isDead);
+      return !(inst.sourceType === 'monster' && (inst.isDead || inst.isHidden));
     });
 
     PlayerViewChannel.send({
@@ -1692,12 +1903,28 @@ const UI = (() => {
           ? inst.streamLabel
           : (inst.publicName || inst.displayName);
 
+        // Bloodied/critical status, computed from HP percentage -- sent
+        // as a category (never the exact HP numbers, which the app
+        // already never broadcasts to players) so players get a visual
+        // cue without seeing precise life totals. Dead combatants
+        // always report 'normal' since isDead takes priority and
+        // already shows its own DEAD tag (per the agreed behavior);
+        // there's no point computing bloodied/critical for something
+        // that won't display it anyway.
+        let hpStatus = 'normal';
+        if (!inst.isDead && inst.maxHp > 0) {
+          const pct = inst.currentHp / inst.maxHp;
+          if (pct <= 0.25) hpStatus = 'critical';
+          else if (pct <= 0.5) hpStatus = 'bloodied';
+        }
+
         return {
           instanceId: inst.instanceId,
           label,
           initiative: inst.initiative,
           isActive: inst.instanceId === activeId,
           isDead: inst.isDead,
+          hpStatus,
           // Player view shows condition NAMES only -- duration/expired
           // detail is a DM-only concept, not something to surface to
           // players/viewers.
@@ -2143,6 +2370,14 @@ const UI = (() => {
       }
 
       layoutEl.style.gridTemplateColumns = `${left}px ${middle}px ${right}px`;
+
+      // The middle column's width changing here can make previously-set
+      // condition icon sizes stale (a row that fit fine at the old
+      // width might now need to shrink, or could grow back to full
+      // size if the column got wider) -- re-fit every row's icons
+      // whenever this recompute happens, not just once at the initial
+      // renderEncounter() call.
+      document.querySelectorAll('.turn-row-conditions-col').forEach(fitConditionIcons);
     }
 
     recompute();

@@ -148,9 +148,18 @@
         ? `<div class="player-view-conditions">${c.conditions.map((cond) => `<span class="player-view-condition-tag">${escapeHtml(cond)}</span>`).join('')}</div>`
         : '';
 
+      // Bloodied/critical status icon, sitting between initiative and
+      // the name/conditions column -- the app deliberately never sends
+      // exact HP numbers to the player view, only this category, so
+      // there's nothing more precise to show here even for 'normal'.
+      const statusIconHtml = (c.hpStatus === 'bloodied' || c.hpStatus === 'critical')
+        ? `<div class="player-view-status-col"><img src="assets/icons/state-${c.hpStatus}.png" alt="${c.hpStatus === 'critical' ? 'Kriticky zraněn' : 'Krvácí'}" title="${c.hpStatus === 'critical' ? 'Kriticky zraněn' : 'Krvácí'}" class="player-view-status-icon" onerror="this.style.display='none'" /></div>`
+        : '<div class="player-view-status-col"></div>';
+
       return `
         <div class="${rowClasses}">
           <div class="player-view-initiative">${c.initiative === null ? '–' : c.initiative}</div>
+          ${statusIconHtml}
           <div class="player-view-main-col">
             <div class="player-view-name">
               ${c.isActive ? '<span class="player-view-active-marker">&#9876;</span>' : ''}

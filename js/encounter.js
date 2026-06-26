@@ -39,7 +39,8 @@ const Encounter = (() => {
   const CONDITIONS = [
     'Prone', 'Grappled', 'Restrained', 'Poisoned', 'Frightened',
     'Charmed', 'Paralyzed', 'Stunned', 'Unconscious', 'Invisible',
-    'Blinded', 'Deafened', 'Concentration',
+    'Blinded', 'Deafened', 'Incapacitated', 'Petrified', 'Exhaustion',
+    'Concentration',
   ];
 
   const DURATION_TYPES = ['manual', 'rounds', 'startOfTurn', 'endOfTurn', 'saveEnds'];
@@ -182,6 +183,13 @@ const Encounter = (() => {
     if (inst.sourceType === 'monster' && inst.isAnonymized === undefined) {
       inst.isAnonymized = true;
     }
+    // Backward compatibility: encounters saved before isHidden existed
+    // default to false (visible) -- this is a newer, distinct concept
+    // from isAnonymized (name-hiding vs. fully absent from the player
+    // view), so there's no equivalent old behavior to preserve here.
+    if (inst.sourceType === 'monster' && inst.isHidden === undefined) {
+      inst.isHidden = false;
+    }
     return inst;
   }
 
@@ -247,6 +255,14 @@ const Encounter = (() => {
         // backward-compat pass for how existing saved encounters are
         // handled (they keep the old always-anonymous behavior).
         isAnonymized: false,
+        // Controls whether this monster appears in the player-view
+        // broadcast AT ALL (not just name-hiding like isAnonymized) --
+        // for monsters players don't know are present yet. Also makes
+        // nextTurn()/previousTurn() skip this combatant's turn entirely,
+        // the same way isDead does, since a hidden monster's turn
+        // happening "in the DM's head" shouldn't surface to players as
+        // a gap in the visible turn order.
+        isHidden: false,
         currentHp: template.hitPoints,
         maxHp: template.hitPoints,
         tempHp: 0,
@@ -543,6 +559,17 @@ const Encounter = (() => {
     inst.isAnonymized = !inst.isAnonymized;
   }
 
+  /** Toggles whether a monster is fully hidden from the player view
+   *  broadcast (not just name-hiding -- see isAnonymized above). Used
+   *  for monsters the players don't know are present yet (e.g. an
+   *  ambusher waiting to strike). When hidden, this combatant's turn is
+   *  also skipped by nextTurn()/previousTurn(), the same way isDead is. */
+  function toggleMonsterHidden(instanceId) {
+    const inst = getInstance(instanceId);
+    if (!inst || inst.sourceType !== 'monster') return;
+    inst.isHidden = !inst.isHidden;
+  }
+
   // ---- Conditions ----------------------------------------------------------------
 
   /** Adds a condition to a combatant (bullet A/B/C). `options` lets the
@@ -702,7 +729,7 @@ const Encounter = (() => {
   }
 
   function isSkippableForTurnOrder(inst) {
-    return inst.sourceType === 'monster' && inst.isDead === true;
+    return inst.sourceType === 'monster' && (inst.isDead === true || inst.isHidden === true);
   }
 
   function getActiveInstanceId() {
@@ -712,7 +739,13 @@ const Encounter = (() => {
     if (state.activeInstanceId && ordered.some((i) => i.instanceId === state.activeInstanceId)) {
       return state.activeInstanceId;
     }
-    return ordered[0].instanceId;
+    // Don't default to ordered[0] unconditionally -- if it's dead or
+    // hidden, the same skip logic nextTurn()/previousTurn() use should
+    // apply here too, otherwise a dead/hidden monster sorted first in
+    // initiative could incorrectly appear "active" before any turn
+    // navigation has happened yet.
+    const firstEligible = ordered.find((i) => !isSkippableForTurnOrder(i));
+    return (firstEligible || ordered[0]).instanceId;
   }
 
   /** Advances to the next combatant in turn order, skipping over any
@@ -866,6 +899,7 @@ const Encounter = (() => {
     setMax,
     markDead,
     toggleMonsterAnonymization,
+    toggleMonsterHidden,
     addCondition,
     removeCondition,
     setNotes,
